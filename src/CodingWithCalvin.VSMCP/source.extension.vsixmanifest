@@ -5,7 +5,7 @@
     <DisplayName>VS MCP Server</DisplayName>
     <Description xml:space="preserve">Exposes Visual Studio features as an MCP (Model Context Protocol) server, enabling AI assistants like Claude to interact with Visual Studio programmatically.</Description>
     <MoreInfo>https://github.com/CodingWithCalvin/VS-VSMCP</MoreInfo>
-    <License>resources\LICENSE</License>
+    <License>LICENSE</License>
     <!-- TODO: Add icon.png (128x128 or larger) -->
     <Tags>MCP, AI, Claude, LLM, Automation</Tags>
   </Metadata>

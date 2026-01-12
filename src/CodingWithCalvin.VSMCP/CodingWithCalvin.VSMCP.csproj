@@ -18,8 +18,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\..\resources\**\*">
-      <Link>resources\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    <Content Include="..\..\LICENSE">
+      <Link>LICENSE</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
