@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/CodingWithCalvin.VSMCP/CodingWithCalvin.VSMCP.csproj" />
+  <Project Path="src/CodingWithCalvin.VSMCP.Server/CodingWithCalvin.VSMCP.Server.csproj" />
+  <Project Path="src/CodingWithCalvin.VSMCP.Shared/CodingWithCalvin.VSMCP.Shared.csproj" />
+</Solution>

@@ -1,0 +1,39 @@
+<Project Sdk="CodingWithCalvin.VsixSdk/0.4.0">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <RootNamespace>CodingWithCalvin.VSMCP</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Community.VisualStudio.Toolkit.17" Version="17.0.507" />
+    <PackageReference Include="CodingWithCalvin.Otel4Vsix" Version="0.2.2" />
+    <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.14.40265" />
+      </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CodingWithCalvin.VSMCP.Shared\CodingWithCalvin.VSMCP.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\resources\**\*">
+      <Link>resources\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Include the server executable in the VSIX -->
+  <Target Name="IncludeServerInVsix" AfterTargets="Build">
+    <ItemGroup>
+      <Content Include="$(SolutionDir)src\CodingWithCalvin.VSMCP.Server\bin\$(Configuration)\net10.0\**\*">
+        <Link>Server\%(RecursiveDir)%(Filename)%(Extension)</Link>
+        <IncludeInVSIX>true</IncludeInVSIX>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+  </Target>
+
+</Project>

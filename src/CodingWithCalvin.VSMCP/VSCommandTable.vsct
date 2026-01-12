@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+  <Extern href="stdidcmd.h"/>
+  <Extern href="vsshlids.h"/>
+
+  <Commands package="guidVSMCPPackage">
+    <Groups>
+      <Group guid="guidVSMCPPackageCmdSet" id="VSMCPMenuGroup" priority="0x0600">
+        <Parent guid="guidVSMCPPackageCmdSet" id="VSMCPMenu"/>
+      </Group>
+      <Group guid="guidVSMCPPackageCmdSet" id="VSMCPCopyGroup" priority="0x0700">
+        <Parent guid="guidVSMCPPackageCmdSet" id="VSMCPMenu"/>
+      </Group>
+      <Group guid="guidVSMCPPackageCmdSet" id="VSMCPSettingsGroup" priority="0x0800">
+        <Parent guid="guidVSMCPPackageCmdSet" id="VSMCPMenu"/>
+      </Group>
+    </Groups>
+
+    <Menus>
+      <Menu guid="guidVSMCPPackageCmdSet" id="VSMCPMenu" priority="0x0100" type="Menu">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_TOOLS_OTHER"/>
+        <Strings>
+          <ButtonText>VSMCP</ButtonText>
+        </Strings>
+      </Menu>
+    </Menus>
+
+    <Buttons>
+      <Button guid="guidVSMCPPackageCmdSet" id="cmdidStartServer" priority="0x0100" type="Button">
+        <Parent guid="guidVSMCPPackageCmdSet" id="VSMCPMenuGroup"/>
+        <Strings>
+          <ButtonText>Start Server</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidVSMCPPackageCmdSet" id="cmdidStopServer" priority="0x0200" type="Button">
+        <Parent guid="guidVSMCPPackageCmdSet" id="VSMCPMenuGroup"/>
+        <Strings>
+          <ButtonText>Stop Server</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidVSMCPPackageCmdSet" id="cmdidRestartServer" priority="0x0300" type="Button">
+        <Parent guid="guidVSMCPPackageCmdSet" id="VSMCPMenuGroup"/>
+        <Strings>
+          <ButtonText>Restart Server</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidVSMCPPackageCmdSet" id="cmdidCopyServerUrl" priority="0x0400" type="Button">
+        <Parent guid="guidVSMCPPackageCmdSet" id="VSMCPCopyGroup"/>
+        <Strings>
+          <ButtonText>Copy Server URL</ButtonText>
+        </Strings>
+      </Button>
+    </Buttons>
+  </Commands>
+
+  <Symbols>
+    <GuidSymbol name="guidVSMCPPackage" value="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}" />
+    <GuidSymbol name="guidVSMCPPackageCmdSet" value="{B2C3D4E5-F6A7-8901-BCDE-F12345678901}">
+      <IDSymbol name="VSMCPMenu" value="0x1000"/>
+      <IDSymbol name="VSMCPMenuGroup" value="0x1100"/>
+      <IDSymbol name="VSMCPCopyGroup" value="0x1200"/>
+      <IDSymbol name="VSMCPSettingsGroup" value="0x1300"/>
+      <IDSymbol name="cmdidStartServer" value="0x0100"/>
+      <IDSymbol name="cmdidStopServer" value="0x0101"/>
+      <IDSymbol name="cmdidRestartServer" value="0x0102"/>
+      <IDSymbol name="cmdidCopyServerUrl" value="0x0103"/>
+    </GuidSymbol>
+  </Symbols>
+</CommandTable>
