@@ -1,0 +1,13 @@
+name: Preview Changelog
+
+run-name: Preview release notes for next release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  preview:
+    name: Preview
+    uses: CodingWithCalvin/.github/.github/workflows/generate-changelog.yml@main
+    secrets: inherit
+

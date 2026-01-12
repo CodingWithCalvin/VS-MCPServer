@@ -107,10 +107,10 @@ VS-VSMCP is a Visual Studio 2022/2026 extension that exposes Visual Studio featu
 
 ```bash
 # Build the solution
-dotnet build CodingWithCalvin.VSMCP.slnx
+dotnet build src/CodingWithCalvin.VSMCP.slnx
 
 # Build Release
-dotnet build CodingWithCalvin.VSMCP.slnx -c Release
+dotnet build src/CodingWithCalvin.VSMCP.slnx -c Release
 
 # Build specific project
 dotnet build src/CodingWithCalvin.VSMCP/CodingWithCalvin.VSMCP.csproj
