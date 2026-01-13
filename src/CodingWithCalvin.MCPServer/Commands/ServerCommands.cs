@@ -47,6 +47,7 @@ internal sealed class ServerCommands
         // Show Available Tools command
         var showToolsCommandId = new CommandID(VSCommandTableVsct.guidMCPServerPackageCmdSet.Guid, VSCommandTableVsct.guidMCPServerPackageCmdSet.cmdidShowTools);
         var showToolsCommand = new OleMenuCommand(OnShowTools, showToolsCommandId);
+        showToolsCommand.BeforeQueryStatus += OnBeforeQueryStatusStop;
         commandService.AddCommand(showToolsCommand);
     }
 
