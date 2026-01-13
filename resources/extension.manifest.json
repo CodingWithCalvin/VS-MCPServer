@@ -5,7 +5,7 @@
     "other"
   ],
   "identity": {
-    "internalName": "VS-VSMCP"
+    "internalName": "VS-MCPServer"
   },
   "overview": "../README.md",
   "publisher": "CodingWithCalvin",
