@@ -11,9 +11,9 @@ jobs:
   publish:
     uses: CodingWithCalvin/.github/.github/workflows/vsix-publish.yml@main
     with:
-      extension-name: VSMCP
-      display-name: 'VS MCP Server'
-      marketplace-id: CodingWithCalvin.VS-VSMCP
+      extension-name: MCPServer
+      display-name: 'MCP Server'
+      marketplace-id: CodingWithCalvin.VS-MCPServer
       description: 'Visual Studio extension that exposes VS features as an MCP server for AI assistants'
       hashtags: ''
     secrets: inherit
