@@ -1,0 +1,61 @@
+﻿<Project Sdk="CodingWithCalvin.VsixSdk/0.4.0">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <RootNamespace>CodingWithCalvin.MCPServer</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CodingWithCalvin.Otel4Vsix" Version="0.2.2" />
+    <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.14.40265" />
+    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.*" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CodingWithCalvin.MCPServer.Shared\CodingWithCalvin.MCPServer.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\LICENSE">
+      <Link>resources\LICENSE</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="..\..\assets\logo.png">
+      <Link>resources\logo.png</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <ServerProjectDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\CodingWithCalvin.MCPServer.Server\'))</ServerProjectDir>
+    <ServerOutputDir>$(ServerProjectDir)bin\$(Configuration)\net10.0\</ServerOutputDir>
+    <ServerPublishDir>$(ServerProjectDir)bin\$(Configuration)\net10.0\publish\</ServerPublishDir>
+  </PropertyGroup>
+
+  <!-- Build and publish the server project as self-contained -->
+  <Target Name="BuildServer" BeforeTargets="Build">
+    <Exec Command="dotnet publish &quot;$(ServerProjectDir)CodingWithCalvin.MCPServer.Server.csproj&quot; -c $(Configuration) --self-contained -r win-x64 -o &quot;$(ServerPublishDir)&quot;" />
+    <Message Importance="high" Text="Server published to: $(ServerPublishDir)" />
+  </Target>
+
+  <!-- Include the server executable in the VSIX -->
+  <Target Name="IncludeServerInVsix" BeforeTargets="GetVsixSourceItems" DependsOnTargets="BuildServer">
+    <ItemGroup>
+      <VSIXSourceItem Include="$(ServerPublishDir)**\*.*">
+        <VSIXSubPath>Server\%(RecursiveDir)</VSIXSubPath>
+      </VSIXSourceItem>
+    </ItemGroup>
+    <Message Importance="high" Text="Including server from: $(ServerPublishDir)" />
+  </Target>
+
+  <!-- Copy server files to output directory for debugging -->
+  <Target Name="CopyServerToOutput" AfterTargets="Build" DependsOnTargets="BuildServer">
+    <ItemGroup>
+      <ServerFiles Include="$(ServerPublishDir)**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ServerFiles)" DestinationFolder="$(OutputPath)Server\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

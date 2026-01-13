@@ -2,10 +2,11 @@
 
 **Let AI assistants like Claude control Visual Studio through the Model Context Protocol!**
 
-[![License](https://img.shields.io/github/license/CodingWithCalvin/VS-VSMCP?style=for-the-badge)](https://github.com/CodingWithCalvin/VS-VSMCP/blob/main/LICENSE)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/CodingWithCalvin/VS-VSMCP/build.yml?style=for-the-badge)](https://github.com/CodingWithCalvin/VS-VSMCP/actions/workflows/build.yml)
-[![Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/CodingWithCalvin.VS-VSMCP?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=CodingWithCalvin.VS-VSMCP)
-[![Marketplace Installs](https://img.shields.io/visual-studio-marketplace/i/CodingWithCalvin.VS-VSMCP?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=CodingWithCalvin.VS-VSMCP)
+[![License](https://img.shields.io/github/license/CodingWithCalvin/VS-MCPServer?style=for-the-badge)](https://github.com/CodingWithCalvin/VS-MCPServer/blob/main/LICENSE)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/CodingWithCalvin/VS-MCPServer/build.yml?style=for-the-badge)](https://github.com/CodingWithCalvin/VS-MCPServer/actions/workflows/build.yml)
+[![Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/CodingWithCalvin.VS-MCPServer?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=CodingWithCalvin.VS-MCPServer)
+[![Marketplace Installs](https://img.shields.io/visual-studio-marketplace/i/CodingWithCalvin.VS-MCPServer?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=CodingWithCalvin.VS-MCPServer)
+[![Marketplace Rating](https://img.shields.io/visual-studio-marketplace/r/CodingWithCalvin.VS-MCPServer?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=CodingWithCalvin.VS-MCPServer)
 
 ---
 
@@ -16,34 +17,46 @@
 ## ✨ Features
 
 ### 📂 Solution Tools
-- **solution_info** - Get information about the current solution
-- **solution_open** - Open a solution file
-- **solution_close** - Close the current solution
-- **project_list** - List all projects in the solution
-- **project_info** - Get detailed project information
+
+| Tool | Description |
+|------|-------------|
+| `solution_info` | Get information about the current solution |
+| `solution_open` | Open a solution file |
+| `solution_close` | Close the current solution |
+| `project_list` | List all projects in the solution |
+| `project_info` | Get detailed project information |
 
 ### 📝 Document Tools
-- **document_list** - List all open documents
-- **document_active** - Get the active document
-- **document_open** - Open a file in the editor
-- **document_close** - Close a document
-- **document_read** - Read document contents
-- **document_write** - Write to a document
+
+| Tool | Description |
+|------|-------------|
+| `document_list` | List all open documents |
+| `document_active` | Get the active document |
+| `document_open` | Open a file in the editor |
+| `document_close` | Close a document |
+| `document_read` | Read document contents |
+| `document_write` | Write to a document |
 
 ### ✏️ Editor Tools
-- **selection_get** - Get the current text selection
-- **selection_set** - Set the selection range
-- **editor_insert** - Insert text at cursor position
-- **editor_replace** - Find and replace text
-- **editor_goto_line** - Navigate to a specific line
-- **editor_find** - Search within documents
+
+| Tool | Description |
+|------|-------------|
+| `selection_get` | Get the current text selection |
+| `selection_set` | Set the selection range |
+| `editor_insert` | Insert text at cursor position |
+| `editor_replace` | Find and replace text |
+| `editor_goto_line` | Navigate to a specific line |
+| `editor_find` | Search within documents |
 
 ### 🔨 Build Tools
-- **build_solution** - Build the entire solution
-- **build_project** - Build a specific project
-- **clean_solution** - Clean the solution
-- **build_cancel** - Cancel a running build
-- **build_status** - Get current build status
+
+| Tool | Description |
+|------|-------------|
+| `build_solution` | Build the entire solution |
+| `build_project` | Build a specific project |
+| `clean_solution` | Clean the solution |
+| `build_cancel` | Cancel a running build |
+| `build_status` | Get current build status |
 
 ## 🛠️ Installation
 
@@ -51,19 +64,19 @@
 
 1. Open Visual Studio 2022 or 2026
 2. Go to **Extensions > Manage Extensions**
-3. Search for "VS MCP Server"
+3. Search for "MCP Server"
 4. Click **Download** and restart Visual Studio
 
 ### Manual Installation
 
-Download the latest `.vsix` from the [Releases](https://github.com/CodingWithCalvin/VS-VSMCP/releases) page and double-click to install.
+Download the latest `.vsix` from the [Releases](https://github.com/CodingWithCalvin/VS-MCPServer/releases) page and double-click to install.
 
 ## 🚀 Usage
 
 ### Starting the Server
 
 1. Open Visual Studio
-2. Go to **Tools > VSMCP > Start Server** (or enable auto-start in settings)
+2. Go to **Tools > MCP Server > Start Server** (or enable auto-start in settings)
 3. The MCP server starts on `http://localhost:5050`
 
 ### Configuring Claude Desktop
@@ -74,7 +87,7 @@ Add this to your Claude Desktop MCP settings:
 {
   "mcpServers": {
     "visual-studio": {
-      "url": "http://localhost:5050"
+      "url": "http://localhost:5050/sse"
     }
   }
 }
@@ -82,18 +95,24 @@ Add this to your Claude Desktop MCP settings:
 
 ### Settings
 
-Configure the extension at **Tools > Options > VSMCP**:
+Configure the extension at **Tools > Options > MCP Server**:
 
-- **Auto-start server** - Start the MCP server when Visual Studio launches
-- **HTTP Port** - Port for the MCP server (default: 5050)
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Auto-start server | Start the MCP server when Visual Studio launches | Off |
+| Binding Address | Address the server binds to | `localhost` |
+| HTTP Port | Port for the MCP server | `5050` |
+| Server Name | Name reported to MCP clients | `Visual Studio MCP` |
+| Log Level | Minimum log level for output | `Information` |
+| Log Retention | Days to keep log files | `7` |
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────┐                ┌─────────────────────┐    named pipes    ┌─────────────────┐
-│  Claude Desktop │   HTTP/SSE    │  VSMCP.Server.exe   │ ◄────────────────► │  VS Extension   │
-│  (MCP Client)   │ ◄────────────► │  (MCP Server)       │    JSON-RPC        │  (Tool Impl)    │
-└─────────────────┘  :5050         └─────────────────────┘                    └─────────────────┘
++------------------+              +----------------------+   named pipes   +------------------+
+|  Claude Desktop  |   HTTP/SSE  |  MCPServer.Server    | <-------------> |  VS Extension    |
+|  (MCP Client)    | <---------> |  (MCP Server)        |    JSON-RPC     |  (Tool Impl)     |
++------------------+    :5050    +----------------------+                 +------------------+
 ```
 
 ## 🤝 Contributing
@@ -103,7 +122,7 @@ Contributions are welcome! Whether it's bug reports, feature requests, or pull r
 ### Development Setup
 
 1. Clone the repository
-2. Open `src/CodingWithCalvin.VSMCP.slnx` in Visual Studio 2022
+2. Open `src/CodingWithCalvin.MCPServer.slnx` in Visual Studio 2022
 3. Ensure you have the "Visual Studio extension development" workload installed
 4. Ensure you have .NET 10.0 SDK installed
 5. Press F5 to launch the experimental instance

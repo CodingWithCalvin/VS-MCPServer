@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+  <Extern href="stdidcmd.h"/>
+  <Extern href="vsshlids.h"/>
+
+  <Commands package="guidMCPServerPackage">
+    <Groups>
+      <Group guid="guidMCPServerPackageCmdSet" id="MCPServerMenuGroup" priority="0x0600">
+        <Parent guid="guidMCPServerPackageCmdSet" id="MCPServerMenu"/>
+      </Group>
+      <Group guid="guidMCPServerPackageCmdSet" id="MCPServerCopyGroup" priority="0x0700">
+        <Parent guid="guidMCPServerPackageCmdSet" id="MCPServerMenu"/>
+      </Group>
+      <Group guid="guidMCPServerPackageCmdSet" id="MCPServerSettingsGroup" priority="0x0800">
+        <Parent guid="guidMCPServerPackageCmdSet" id="MCPServerMenu"/>
+      </Group>
+    </Groups>
+
+    <Menus>
+      <Menu guid="guidMCPServerPackageCmdSet" id="MCPServerMenu" priority="0x0100" type="Menu">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_MM_TOOLSADDINS"/>
+        <Strings>
+          <ButtonText>MCP Server</ButtonText>
+          <CanonicalName>MCPServer</CanonicalName>
+          <LocCanonicalName>MCPServer</LocCanonicalName>
+        </Strings>
+      </Menu>
+    </Menus>
+
+    <Buttons>
+      <Button guid="guidMCPServerPackageCmdSet" id="cmdidStartServer" priority="0x0100" type="Button">
+        <Parent guid="guidMCPServerPackageCmdSet" id="MCPServerMenuGroup"/>
+        <Strings>
+          <ButtonText>Start Server</ButtonText>
+          <CanonicalName>MCPServer.StartServer</CanonicalName>
+          <LocCanonicalName>MCPServer.StartServer</LocCanonicalName>
+        </Strings>
+      </Button>
+      <Button guid="guidMCPServerPackageCmdSet" id="cmdidStopServer" priority="0x0200" type="Button">
+        <Parent guid="guidMCPServerPackageCmdSet" id="MCPServerMenuGroup"/>
+        <Strings>
+          <ButtonText>Stop Server</ButtonText>
+          <CanonicalName>MCPServer.StopServer</CanonicalName>
+          <LocCanonicalName>MCPServer.StopServer</LocCanonicalName>
+        </Strings>
+      </Button>
+      <Button guid="guidMCPServerPackageCmdSet" id="cmdidRestartServer" priority="0x0300" type="Button">
+        <Parent guid="guidMCPServerPackageCmdSet" id="MCPServerMenuGroup"/>
+        <Strings>
+          <ButtonText>Restart Server</ButtonText>
+          <CanonicalName>MCPServer.RestartServer</CanonicalName>
+          <LocCanonicalName>MCPServer.RestartServer</LocCanonicalName>
+        </Strings>
+      </Button>
+      <Button guid="guidMCPServerPackageCmdSet" id="cmdidCopyServerUrl" priority="0x0400" type="Button">
+        <Parent guid="guidMCPServerPackageCmdSet" id="MCPServerCopyGroup"/>
+        <Strings>
+          <ButtonText>Copy Server URL</ButtonText>
+          <CanonicalName>MCPServer.CopyServerUrl</CanonicalName>
+          <LocCanonicalName>MCPServer.CopyServerUrl</LocCanonicalName>
+        </Strings>
+      </Button>
+      <Button guid="guidMCPServerPackageCmdSet" id="cmdidShowTools" priority="0x0500" type="Button">
+        <Parent guid="guidMCPServerPackageCmdSet" id="MCPServerCopyGroup"/>
+        <Strings>
+          <ButtonText>Show Available Tools</ButtonText>
+          <CanonicalName>MCPServer.ShowTools</CanonicalName>
+          <LocCanonicalName>MCPServer.ShowTools</LocCanonicalName>
+        </Strings>
+      </Button>
+    </Buttons>
+  </Commands>
+
+  <Symbols>
+    <GuidSymbol name="guidMCPServerPackage" value="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}" />
+    <GuidSymbol name="guidMCPServerPackageCmdSet" value="{B2C3D4E5-F6A7-8901-BCDE-F12345678901}">
+      <IDSymbol name="MCPServerMenu" value="0x1000"/>
+      <IDSymbol name="MCPServerMenuGroup" value="0x1100"/>
+      <IDSymbol name="MCPServerCopyGroup" value="0x1200"/>
+      <IDSymbol name="MCPServerSettingsGroup" value="0x1300"/>
+      <IDSymbol name="cmdidStartServer" value="0x0100"/>
+      <IDSymbol name="cmdidStopServer" value="0x0101"/>
+      <IDSymbol name="cmdidRestartServer" value="0x0102"/>
+      <IDSymbol name="cmdidCopyServerUrl" value="0x0103"/>
+      <IDSymbol name="cmdidShowTools" value="0x0104"/>
+    </GuidSymbol>
+  </Symbols>
+</CommandTable>

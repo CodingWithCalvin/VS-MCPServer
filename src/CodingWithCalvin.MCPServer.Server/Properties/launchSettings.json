@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "CodingWithCalvin.MCPServer.Server": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:57573;http://localhost:57574"
+    }
+  }
+}

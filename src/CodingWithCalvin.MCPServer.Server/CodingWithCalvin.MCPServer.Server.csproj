@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>CodingWithCalvin.MCPServer.Server</RootNamespace>
+    <AssemblyName>CodingWithCalvin.MCPServer.Server</AssemblyName>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol" Version="0.2.0-preview.2" />
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.2.0-preview.2" />
+    <PackageReference Include="StreamJsonRpc" Version="2.20.20" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CodingWithCalvin.MCPServer.Shared\CodingWithCalvin.MCPServer.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

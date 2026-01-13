@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json.schemastore.org/vsix-publish",
+  "categories": [
+    "coding",
+    "other"
+  ],
+  "identity": {
+    "internalName": "VS-VSMCP"
+  },
+  "overview": "../README.md",
+  "publisher": "CodingWithCalvin",
+  "qna": true,
+  "repo": "https://www.github.com/CodingWithCalvin/VS-VSMCP"
+}
