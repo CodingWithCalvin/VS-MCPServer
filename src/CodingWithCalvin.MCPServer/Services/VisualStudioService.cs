@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using CodingWithCalvin.MCPServer.Shared.Models;
 using CodingWithCalvin.Otel4Vsix;
@@ -546,5 +547,498 @@ public class VisualStudioService : IVisualStudioService
             },
             FailedProjects = lastInfo
         };
+    }
+
+    public async Task<List<SymbolInfo>> GetDocumentSymbolsAsync(string path)
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+        var symbols = new List<SymbolInfo>();
+
+        if (dte.Solution == null)
+        {
+            return symbols;
+        }
+
+        var normalizedPath = NormalizePath(path);
+        var projectItem = dte.Solution.FindProjectItem(normalizedPath);
+        if (projectItem == null)
+        {
+            return symbols;
+        }
+
+        var fileCodeModel = projectItem.FileCodeModel;
+        if (fileCodeModel == null)
+        {
+            return symbols;
+        }
+
+        ExtractSymbols(fileCodeModel.CodeElements, symbols, normalizedPath, string.Empty);
+        return symbols;
+    }
+
+    private void ExtractSymbols(CodeElements elements, List<SymbolInfo> symbols, string filePath, string containerName)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        foreach (CodeElement element in elements)
+        {
+            try
+            {
+                var kind = MapElementKind(element.Kind);
+                if (kind == SymbolKind.Unknown)
+                {
+                    if (element.Kind == vsCMElement.vsCMElementImportStmt ||
+                        element.Kind == vsCMElement.vsCMElementAttribute ||
+                        element.Kind == vsCMElement.vsCMElementParameter)
+                    {
+                        continue;
+                    }
+                }
+
+                var startPoint = element.StartPoint;
+                var endPoint = element.EndPoint;
+
+                var symbolInfo = new SymbolInfo
+                {
+                    Name = element.Name,
+                    FullName = element.FullName,
+                    Kind = kind,
+                    FilePath = filePath,
+                    StartLine = startPoint.Line,
+                    StartColumn = startPoint.LineCharOffset,
+                    EndLine = endPoint.Line,
+                    EndColumn = endPoint.LineCharOffset,
+                    ContainerName = containerName
+                };
+
+                var childElements = GetChildElements(element);
+                if (childElements != null && childElements.Count > 0)
+                {
+                    ExtractSymbols(childElements, symbolInfo.Children, filePath, element.Name);
+                }
+
+                symbols.Add(symbolInfo);
+            }
+            catch (Exception ex)
+            {
+                VsixTelemetry.TrackException(ex);
+            }
+        }
+    }
+
+    private static CodeElements? GetChildElements(CodeElement element)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        try
+        {
+            return element.Kind switch
+            {
+                vsCMElement.vsCMElementNamespace => ((CodeNamespace)element).Members,
+                vsCMElement.vsCMElementClass => ((CodeClass)element).Members,
+                vsCMElement.vsCMElementStruct => ((CodeStruct)element).Members,
+                vsCMElement.vsCMElementInterface => ((CodeInterface)element).Members,
+                vsCMElement.vsCMElementEnum => ((CodeEnum)element).Members,
+                _ => null
+            };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static SymbolKind MapElementKind(vsCMElement kind) => kind switch
+    {
+        vsCMElement.vsCMElementNamespace => SymbolKind.Namespace,
+        vsCMElement.vsCMElementClass => SymbolKind.Class,
+        vsCMElement.vsCMElementStruct => SymbolKind.Struct,
+        vsCMElement.vsCMElementInterface => SymbolKind.Interface,
+        vsCMElement.vsCMElementEnum => SymbolKind.Enum,
+        vsCMElement.vsCMElementFunction => SymbolKind.Function,
+        vsCMElement.vsCMElementProperty => SymbolKind.Property,
+        vsCMElement.vsCMElementVariable => SymbolKind.Field,
+        vsCMElement.vsCMElementEvent => SymbolKind.Event,
+        vsCMElement.vsCMElementDelegate => SymbolKind.Delegate,
+        _ => SymbolKind.Unknown
+    };
+
+    public async Task<WorkspaceSymbolResult> SearchWorkspaceSymbolsAsync(string query, int maxResults = 100)
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+        var result = new WorkspaceSymbolResult();
+
+        if (dte.Solution == null || string.IsNullOrWhiteSpace(query))
+        {
+            return result;
+        }
+
+        var allSymbols = new List<SymbolInfo>();
+        var lowerQuery = query.ToLowerInvariant();
+
+        foreach (EnvDTE.Project project in dte.Solution.Projects)
+        {
+            try
+            {
+                CollectProjectSymbols(project.ProjectItems, allSymbols, lowerQuery, maxResults * 2);
+                if (allSymbols.Count >= maxResults * 2)
+                {
+                    break;
+                }
+            }
+            catch (Exception ex)
+            {
+                VsixTelemetry.TrackException(ex);
+            }
+        }
+
+        var matchingSymbols = allSymbols
+            .Where(s => s.Name.ToLowerInvariant().Contains(lowerQuery) ||
+                       s.FullName.ToLowerInvariant().Contains(lowerQuery))
+            .Take(maxResults)
+            .ToList();
+
+        result.Symbols = matchingSymbols;
+        result.TotalCount = allSymbols.Count;
+        result.Truncated = allSymbols.Count > maxResults;
+
+        return result;
+    }
+
+    private void CollectProjectSymbols(ProjectItems? items, List<SymbolInfo> allSymbols, string query, int limit)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        if (items == null || allSymbols.Count >= limit)
+        {
+            return;
+        }
+
+        foreach (ProjectItem item in items)
+        {
+            try
+            {
+                if (item.FileCodeModel != null)
+                {
+                    var filePath = item.FileNames[1];
+                    CollectCodeElements(item.FileCodeModel.CodeElements, allSymbols, filePath, string.Empty, query, limit);
+                }
+
+                if (item.ProjectItems != null && item.ProjectItems.Count > 0)
+                {
+                    CollectProjectSymbols(item.ProjectItems, allSymbols, query, limit);
+                }
+            }
+            catch (Exception ex)
+            {
+                VsixTelemetry.TrackException(ex);
+            }
+        }
+    }
+
+    private void CollectCodeElements(CodeElements elements, List<SymbolInfo> allSymbols, string filePath, string containerName, string query, int limit)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        if (allSymbols.Count >= limit)
+        {
+            return;
+        }
+
+        foreach (CodeElement element in elements)
+        {
+            try
+            {
+                var kind = MapElementKind(element.Kind);
+                if (kind == SymbolKind.Unknown)
+                {
+                    continue;
+                }
+
+                var lowerName = element.Name.ToLowerInvariant();
+                var lowerFullName = element.FullName.ToLowerInvariant();
+
+                if (lowerName.Contains(query) || lowerFullName.Contains(query))
+                {
+                    var startPoint = element.StartPoint;
+                    var endPoint = element.EndPoint;
+
+                    allSymbols.Add(new SymbolInfo
+                    {
+                        Name = element.Name,
+                        FullName = element.FullName,
+                        Kind = kind,
+                        FilePath = filePath,
+                        StartLine = startPoint.Line,
+                        StartColumn = startPoint.LineCharOffset,
+                        EndLine = endPoint.Line,
+                        EndColumn = endPoint.LineCharOffset,
+                        ContainerName = containerName
+                    });
+                }
+
+                var childElements = GetChildElements(element);
+                if (childElements != null)
+                {
+                    CollectCodeElements(childElements, allSymbols, filePath, element.Name, query, limit);
+                }
+            }
+            catch (Exception ex)
+            {
+                VsixTelemetry.TrackException(ex);
+            }
+        }
+    }
+
+    public async Task<DefinitionResult> GoToDefinitionAsync(string path, int line, int column)
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+        var result = new DefinitionResult();
+
+        try
+        {
+            var opened = await OpenDocumentAsync(path);
+            if (!opened)
+            {
+                return result;
+            }
+
+            var doc = dte.ActiveDocument;
+            if (doc == null)
+            {
+                return result;
+            }
+
+            var textDoc = doc.Object("TextDocument") as TextDocument;
+            if (textDoc == null)
+            {
+                return result;
+            }
+
+            textDoc.Selection.MoveToLineAndOffset(line, column);
+
+            var originalPath = doc.FullName;
+            var originalLine = textDoc.Selection.ActivePoint.Line;
+
+            dte.ExecuteCommand("Edit.GoToDefinition");
+
+            await Task.Delay(100);
+
+            var newDoc = dte.ActiveDocument;
+            if (newDoc != null)
+            {
+                var newTextDoc = newDoc.Object("TextDocument") as TextDocument;
+                if (newTextDoc != null)
+                {
+                    var newPath = newDoc.FullName;
+                    var newLine = newTextDoc.Selection.ActivePoint.Line;
+                    var newColumn = newTextDoc.Selection.ActivePoint.LineCharOffset;
+
+                    if (!PathsEqual(newPath, originalPath) || newLine != originalLine)
+                    {
+                        result.Found = true;
+                        result.SymbolName = GetWordAtPosition(textDoc, line, column);
+
+                        var editPoint = newTextDoc.StartPoint.CreateEditPoint();
+                        editPoint.MoveToLineAndOffset(newLine, 1);
+                        var lineText = editPoint.GetLines(newLine, newLine + 1).Trim();
+
+                        result.Definitions.Add(new LocationInfo
+                        {
+                            FilePath = newPath,
+                            Line = newLine,
+                            Column = newColumn,
+                            EndLine = newLine,
+                            EndColumn = newColumn,
+                            Preview = lineText
+                        });
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            VsixTelemetry.TrackException(ex);
+        }
+
+        return result;
+    }
+
+    private static string GetWordAtPosition(TextDocument textDoc, int line, int column)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        try
+        {
+            var editPoint = textDoc.StartPoint.CreateEditPoint();
+            editPoint.MoveToLineAndOffset(line, column);
+
+            var startPoint = editPoint.CreateEditPoint();
+            startPoint.WordLeft(1);
+            var endPoint = editPoint.CreateEditPoint();
+            endPoint.WordRight(1);
+
+            return startPoint.GetText(endPoint).Trim();
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    public async Task<ReferencesResult> FindReferencesAsync(string path, int line, int column, int maxResults = 100)
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+        var result = new ReferencesResult();
+
+        try
+        {
+            var opened = await OpenDocumentAsync(path);
+            if (!opened)
+            {
+                return result;
+            }
+
+            var doc = dte.ActiveDocument;
+            if (doc == null)
+            {
+                return result;
+            }
+
+            var textDoc = doc.Object("TextDocument") as TextDocument;
+            if (textDoc == null)
+            {
+                return result;
+            }
+
+            textDoc.Selection.MoveToLineAndOffset(line, column);
+            var symbolName = GetWordAtPosition(textDoc, line, column);
+
+            if (string.IsNullOrWhiteSpace(symbolName))
+            {
+                return result;
+            }
+
+            result.SymbolName = symbolName;
+
+            var references = await FindInSolutionAsync(dte, symbolName, maxResults);
+            result.References = references;
+            result.TotalCount = references.Count;
+            result.Found = references.Count > 0;
+            result.Truncated = references.Count >= maxResults;
+        }
+        catch (Exception ex)
+        {
+            VsixTelemetry.TrackException(ex);
+        }
+
+        return result;
+    }
+
+    private async Task<List<LocationInfo>> FindInSolutionAsync(DTE2 dte, string searchText, int maxResults)
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+        var locations = new List<LocationInfo>();
+
+        if (dte.Solution == null)
+        {
+            return locations;
+        }
+
+        foreach (EnvDTE.Project project in dte.Solution.Projects)
+        {
+            try
+            {
+                await SearchProjectItemsAsync(project.ProjectItems, searchText, locations, maxResults);
+                if (locations.Count >= maxResults)
+                {
+                    break;
+                }
+            }
+            catch (Exception ex)
+            {
+                VsixTelemetry.TrackException(ex);
+            }
+        }
+
+        return locations;
+    }
+
+    private async Task SearchProjectItemsAsync(ProjectItems? items, string searchText, List<LocationInfo> locations, int maxResults)
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+        if (items == null || locations.Count >= maxResults)
+        {
+            return;
+        }
+
+        foreach (ProjectItem item in items)
+        {
+            try
+            {
+                if (item.FileNames[1] is string filePath &&
+                    (filePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ||
+                     filePath.EndsWith(".vb", StringComparison.OrdinalIgnoreCase)))
+                {
+                    var content = await Task.Run(() =>
+                    {
+                        if (File.Exists(filePath))
+                        {
+                            return File.ReadAllText(filePath);
+                        }
+                        return null;
+                    });
+
+                    if (content != null)
+                    {
+                        var lines = content.Split('\n');
+                        for (int i = 0; i < lines.Length && locations.Count < maxResults; i++)
+                        {
+                            var lineText = lines[i];
+                            var index = 0;
+                            while ((index = lineText.IndexOf(searchText, index, StringComparison.Ordinal)) >= 0 &&
+                                   locations.Count < maxResults)
+                            {
+                                if (IsWordBoundary(lineText, index, searchText.Length))
+                                {
+                                    locations.Add(new LocationInfo
+                                    {
+                                        FilePath = filePath,
+                                        Line = i + 1,
+                                        Column = index + 1,
+                                        EndLine = i + 1,
+                                        EndColumn = index + 1 + searchText.Length,
+                                        Preview = lineText.Trim()
+                                    });
+                                }
+                                index += searchText.Length;
+                            }
+                        }
+                    }
+                }
+
+                if (item.ProjectItems != null && item.ProjectItems.Count > 0)
+                {
+                    await SearchProjectItemsAsync(item.ProjectItems, searchText, locations, maxResults);
+                }
+            }
+            catch (Exception ex)
+            {
+                VsixTelemetry.TrackException(ex);
+            }
+        }
+    }
+
+    private static bool IsWordBoundary(string text, int start, int length)
+    {
+        var beforeOk = start == 0 || !char.IsLetterOrDigit(text[start - 1]);
+        var afterOk = start + length >= text.Length || !char.IsLetterOrDigit(text[start + length]);
+        return beforeOk && afterOk;
     }
 }

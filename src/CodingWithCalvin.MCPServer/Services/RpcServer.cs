@@ -184,4 +184,12 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
     public Task<bool> CleanSolutionAsync() => _vsService.CleanSolutionAsync();
     public Task<bool> CancelBuildAsync() => _vsService.CancelBuildAsync();
     public Task<BuildStatus> GetBuildStatusAsync() => _vsService.GetBuildStatusAsync();
+
+    public Task<List<SymbolInfo>> GetDocumentSymbolsAsync(string path) => _vsService.GetDocumentSymbolsAsync(path);
+    public Task<WorkspaceSymbolResult> SearchWorkspaceSymbolsAsync(string query, int maxResults = 100)
+        => _vsService.SearchWorkspaceSymbolsAsync(query, maxResults);
+    public Task<DefinitionResult> GoToDefinitionAsync(string path, int line, int column)
+        => _vsService.GoToDefinitionAsync(path, line, column);
+    public Task<ReferencesResult> FindReferencesAsync(string path, int line, int column, int maxResults = 100)
+        => _vsService.FindReferencesAsync(path, line, column, maxResults);
 }
