@@ -65,7 +65,7 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
         }
 
         var tools = new List<ToolInfo>();
-        var toolTypes = new[] { typeof(Tools.SolutionTools), typeof(Tools.DocumentTools), typeof(Tools.BuildTools) };
+        var toolTypes = new[] { typeof(Tools.SolutionTools), typeof(Tools.DocumentTools), typeof(Tools.BuildTools), typeof(Tools.NavigationTools) };
 
         foreach (var toolType in toolTypes)
         {
@@ -124,4 +124,12 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
     public Task<bool> CleanSolutionAsync() => Proxy.CleanSolutionAsync();
     public Task<bool> CancelBuildAsync() => Proxy.CancelBuildAsync();
     public Task<BuildStatus> GetBuildStatusAsync() => Proxy.GetBuildStatusAsync();
+
+    public Task<List<SymbolInfo>> GetDocumentSymbolsAsync(string path) => Proxy.GetDocumentSymbolsAsync(path);
+    public Task<WorkspaceSymbolResult> SearchWorkspaceSymbolsAsync(string query, int maxResults = 100)
+        => Proxy.SearchWorkspaceSymbolsAsync(query, maxResults);
+    public Task<DefinitionResult> GoToDefinitionAsync(string path, int line, int column)
+        => Proxy.GoToDefinitionAsync(path, line, column);
+    public Task<ReferencesResult> FindReferencesAsync(string path, int line, int column, int maxResults = 100)
+        => Proxy.FindReferencesAsync(path, line, column, maxResults);
 }

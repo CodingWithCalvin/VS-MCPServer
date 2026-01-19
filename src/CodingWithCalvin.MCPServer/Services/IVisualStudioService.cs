@@ -30,4 +30,9 @@ public interface IVisualStudioService
     Task<bool> CleanSolutionAsync();
     Task<bool> CancelBuildAsync();
     Task<BuildStatus> GetBuildStatusAsync();
+
+    Task<List<SymbolInfo>> GetDocumentSymbolsAsync(string path);
+    Task<WorkspaceSymbolResult> SearchWorkspaceSymbolsAsync(string query, int maxResults = 100);
+    Task<DefinitionResult> GoToDefinitionAsync(string path, int line, int column);
+    Task<ReferencesResult> FindReferencesAsync(string path, int line, int column, int maxResults = 100);
 }
