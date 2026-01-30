@@ -1,0 +1,80 @@
+# Commitlint configuration for conventional commits
+# Based on: https://www.conventionalcommits.org/
+
+extends:
+  - '@commitlint/config-conventional'
+
+rules:
+  # Type enum - allowed commit types
+  type-enum:
+    - 2  # Level: error
+    - always
+    - # Allowed types:
+      - feat      # New feature
+      - fix       # Bug fix
+      - docs      # Documentation only changes
+      - style     # Code style changes (formatting, missing semi-colons, etc)
+      - refactor  # Code refactoring (neither fixes a bug nor adds a feature)
+      - perf      # Performance improvements
+      - test      # Adding or updating tests
+      - build     # Changes to build system or dependencies
+      - ci        # CI/CD configuration changes
+      - chore     # Other changes that don't modify src or test files
+      - revert    # Revert a previous commit
+
+  # Type case should be lowercase
+  type-case:
+    - 2
+    - always
+    - lower-case
+
+  # Type must not be empty
+  type-empty:
+    - 2
+    - never
+
+  # Scope case should be lowercase
+  scope-case:
+    - 2
+    - always
+    - lower-case
+
+  # Subject must not be empty
+  subject-empty:
+    - 2
+    - never
+
+  # Subject must not end with a period
+  subject-full-stop:
+    - 2
+    - never
+    - '.'
+
+  # Disable subject-case to allow uppercase abbreviations (PR, API, CLI, etc.)
+  subject-case:
+    - 0
+
+  # Header (first line) max length
+  header-max-length:
+    - 2
+    - always
+    - 72
+
+  # Body should have a blank line before it
+  body-leading-blank:
+    - 1  # Warning level
+    - always
+
+  # Footer should have a blank line before it
+  footer-leading-blank:
+    - 1  # Warning level
+    - always
+
+  # Body max line length
+  body-max-line-length:
+    - 1  # Warning level
+    - always
+    - 100
+
+# Help URL shown in error messages
+helpUrl: 'https://www.conventionalcommits.org/'

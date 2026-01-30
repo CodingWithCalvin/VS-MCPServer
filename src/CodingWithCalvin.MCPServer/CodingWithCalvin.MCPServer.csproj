@@ -22,7 +22,7 @@
       <Link>resources\LICENSE</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\..\assets\logo.png">
+    <Content Include="..\..\resources\logo.png">
       <Link>resources\logo.png</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
