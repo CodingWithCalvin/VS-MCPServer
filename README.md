@@ -1,22 +1,46 @@
-# 🤖 VS MCP Server
+<p align="center">
+  <img src="https://raw.githubusercontent.com/CodingWithCalvin/VS-MCPServer/main/resources/logo.png" alt="VS MCP Server Logo" width="128" height="128">
+</p>
 
-**Let AI assistants like Claude control Visual Studio through the Model Context Protocol!**
+<h1 align="center">VS MCP Server</h1>
 
-[![License](https://img.shields.io/github/license/CodingWithCalvin/VS-MCPServer?style=for-the-badge)](https://github.com/CodingWithCalvin/VS-MCPServer/blob/main/LICENSE)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/CodingWithCalvin/VS-MCPServer/build.yml?style=for-the-badge)](https://github.com/CodingWithCalvin/VS-MCPServer/actions/workflows/build.yml)
-[![Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/CodingWithCalvin.VS-MCPServer?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=CodingWithCalvin.VS-MCPServer)
-[![Marketplace Installs](https://img.shields.io/visual-studio-marketplace/i/CodingWithCalvin.VS-MCPServer?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=CodingWithCalvin.VS-MCPServer)
-[![Marketplace Rating](https://img.shields.io/visual-studio-marketplace/r/CodingWithCalvin.VS-MCPServer?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=CodingWithCalvin.VS-MCPServer)
+<p align="center">
+  <strong>Let AI assistants like Claude control Visual Studio through the Model Context Protocol!</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/CodingWithCalvin/VS-MCPServer/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/CodingWithCalvin/VS-MCPServer?style=for-the-badge" alt="License">
+  </a>
+  <a href="https://github.com/CodingWithCalvin/VS-MCPServer/actions/workflows/build.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/CodingWithCalvin/VS-MCPServer/build.yml?style=for-the-badge" alt="Build Status">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://marketplace.visualstudio.com/items?itemName=CodingWithCalvin.VS-MCPServer">
+    <img src="https://img.shields.io/visual-studio-marketplace/v/CodingWithCalvin.VS-MCPServer?style=for-the-badge" alt="Marketplace Version">
+  </a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=CodingWithCalvin.VS-MCPServer">
+    <img src="https://img.shields.io/visual-studio-marketplace/i/CodingWithCalvin.VS-MCPServer?style=for-the-badge" alt="Marketplace Installations">
+  </a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=CodingWithCalvin.VS-MCPServer">
+    <img src="https://img.shields.io/visual-studio-marketplace/d/CodingWithCalvin.VS-MCPServer?style=for-the-badge" alt="Marketplace Downloads">
+  </a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=CodingWithCalvin.VS-MCPServer">
+    <img src="https://img.shields.io/visual-studio-marketplace/r/CodingWithCalvin.VS-MCPServer?style=for-the-badge" alt="Marketplace Rating">
+  </a>
+</p>
 
 ---
 
-## 🤔 What is this?
+## What is this?
 
 **VS MCP Server** exposes Visual Studio features through the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/), enabling AI assistants like Claude to interact with your IDE programmatically. Open files, read code, build projects, and more - all through natural conversation!
 
-## ✨ Features
+## Features
 
-### 📂 Solution Tools
+### Solution Tools
 
 | Tool | Description |
 |------|-------------|
@@ -26,7 +50,7 @@
 | `project_list` | List all projects in the solution |
 | `project_info` | Get detailed project information |
 
-### 📝 Document Tools
+### Document Tools
 
 | Tool | Description |
 |------|-------------|
@@ -37,7 +61,7 @@
 | `document_read` | Read document contents |
 | `document_write` | Write to a document |
 
-### ✏️ Editor Tools
+### Editor Tools
 
 | Tool | Description |
 |------|-------------|
@@ -48,7 +72,7 @@
 | `editor_goto_line` | Navigate to a specific line |
 | `editor_find` | Search within documents |
 
-### 🔨 Build Tools
+### Build Tools
 
 | Tool | Description |
 |------|-------------|
@@ -58,7 +82,7 @@
 | `build_cancel` | Cancel a running build |
 | `build_status` | Get current build status |
 
-## 🛠️ Installation
+## Installation
 
 ### Visual Studio Marketplace
 
@@ -71,7 +95,7 @@
 
 Download the latest `.vsix` from the [Releases](https://github.com/CodingWithCalvin/VS-MCPServer/releases) page and double-click to install.
 
-## 🚀 Usage
+## Usage
 
 ### Starting the Server
 
@@ -106,7 +130,7 @@ Configure the extension at **Tools > Options > MCP Server**:
 | Log Level | Minimum log level for output | `Information` |
 | Log Retention | Days to keep log files | `7` |
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 +------------------+              +----------------------+   named pipes   +------------------+
@@ -115,7 +139,7 @@ Configure the extension at **Tools > Options > MCP Server**:
 +------------------+    :5050    +----------------------+                 +------------------+
 ```
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Whether it's bug reports, feature requests, or pull requests - all feedback helps make this extension better.
 
@@ -127,18 +151,19 @@ Contributions are welcome! Whether it's bug reports, feature requests, or pull r
 4. Ensure you have .NET 10.0 SDK installed
 5. Press F5 to launch the experimental instance
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 👥 Contributors
+## Contributors
 
 <!-- readme: contributors -start -->
-[![CalvinAllen](https://avatars.githubusercontent.com/u/41448698?v=4&s=64)](https://github.com/CalvinAllen) 
 <!-- readme: contributors -end -->
 
 ---
 
-Made with ❤️ by [Coding With Calvin](https://github.com/CalvinAllen)
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/CodingWithCalvin">Coding With Calvin</a>
+</p>
