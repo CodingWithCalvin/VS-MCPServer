@@ -34,13 +34,13 @@
 
 ---
 
-## What is this?
+## 🤔 What is this?
 
 **VS MCP Server** exposes Visual Studio features through the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/), enabling AI assistants like Claude to interact with your IDE programmatically. Open files, read code, build projects, and more - all through natural conversation!
 
-## Features
+## ✨ Features
 
-### Solution Tools
+### 📂 Solution Tools
 
 | Tool | Description |
 |------|-------------|
@@ -50,7 +50,7 @@
 | `project_list` | List all projects in the solution |
 | `project_info` | Get detailed project information |
 
-### Document Tools
+### 📝 Document Tools
 
 | Tool | Description |
 |------|-------------|
@@ -61,7 +61,7 @@
 | `document_read` | Read document contents |
 | `document_write` | Write to a document |
 
-### Editor Tools
+### ✏️ Editor Tools
 
 | Tool | Description |
 |------|-------------|
@@ -72,7 +72,7 @@
 | `editor_goto_line` | Navigate to a specific line |
 | `editor_find` | Search within documents |
 
-### Build Tools
+### 🔨 Build Tools
 
 | Tool | Description |
 |------|-------------|
@@ -82,7 +82,7 @@
 | `build_cancel` | Cancel a running build |
 | `build_status` | Get current build status |
 
-## Installation
+## 🛠️ Installation
 
 ### Visual Studio Marketplace
 
@@ -95,15 +95,15 @@
 
 Download the latest `.vsix` from the [Releases](https://github.com/CodingWithCalvin/VS-MCPServer/releases) page and double-click to install.
 
-## Usage
+## 🚀 Usage
 
-### Starting the Server
+### ▶️ Starting the Server
 
 1. Open Visual Studio
 2. Go to **Tools > MCP Server > Start Server** (or enable auto-start in settings)
 3. The MCP server starts on `http://localhost:5050`
 
-### Configuring Claude Desktop
+### 🤖 Configuring Claude Desktop
 
 Add this to your Claude Desktop MCP settings:
 
@@ -117,7 +117,7 @@ Add this to your Claude Desktop MCP settings:
 }
 ```
 
-### Settings
+### ⚙️ Settings
 
 Configure the extension at **Tools > Options > MCP Server**:
 
@@ -130,7 +130,7 @@ Configure the extension at **Tools > Options > MCP Server**:
 | Log Level | Minimum log level for output | `Information` |
 | Log Retention | Days to keep log files | `7` |
 
-## Architecture
+## 🏗️ Architecture
 
 ```
 +------------------+              +----------------------+   named pipes   +------------------+
@@ -139,11 +139,11 @@ Configure the extension at **Tools > Options > MCP Server**:
 +------------------+    :5050    +----------------------+                 +------------------+
 ```
 
-## Contributing
+## 🤝 Contributing
 
 Contributions are welcome! Whether it's bug reports, feature requests, or pull requests - all feedback helps make this extension better.
 
-### Development Setup
+### 🔧 Development Setup
 
 1. Clone the repository
 2. Open `src/CodingWithCalvin.MCPServer.slnx` in Visual Studio 2022
@@ -151,13 +151,13 @@ Contributions are welcome! Whether it's bug reports, feature requests, or pull r
 4. Ensure you have .NET 10.0 SDK installed
 5. Press F5 to launch the experimental instance
 
-## License
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## Contributors
+## 👥 Contributors
 
 <!-- readme: contributors -start -->
 [![CalvinAllen](https://avatars.githubusercontent.com/u/41448698?v=4&s=64)](https://github.com/CalvinAllen) 
