@@ -208,4 +208,11 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
     public Task<List<BreakpointInfo>> DebugGetBreakpointsAsync() => _vsService.DebugGetBreakpointsAsync();
     public Task<List<LocalVariableInfo>> DebugGetLocalsAsync() => _vsService.DebugGetLocalsAsync();
     public Task<List<CallStackFrameInfo>> DebugGetCallStackAsync() => _vsService.DebugGetCallStackAsync();
+
+    public Task<ErrorListResult> GetErrorListAsync(string? severity = null, int maxResults = 100)
+        => _vsService.GetErrorListAsync(severity, maxResults);
+    public Task<OutputReadResult> ReadOutputPaneAsync(string paneIdentifier) => _vsService.ReadOutputPaneAsync(paneIdentifier);
+    public Task<bool> WriteOutputPaneAsync(string paneIdentifier, string message, bool activate = false)
+        => _vsService.WriteOutputPaneAsync(paneIdentifier, message, activate);
+    public Task<List<OutputPaneInfo>> GetOutputPanesAsync() => _vsService.GetOutputPanesAsync();
 }

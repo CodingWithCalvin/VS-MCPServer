@@ -55,6 +55,12 @@ public interface IVisualStudioRpc
     Task<List<BreakpointInfo>> DebugGetBreakpointsAsync();
     Task<List<LocalVariableInfo>> DebugGetLocalsAsync();
     Task<List<CallStackFrameInfo>> DebugGetCallStackAsync();
+
+    // Diagnostics tools
+    Task<ErrorListResult> GetErrorListAsync(string? severity = null, int maxResults = 100);
+    Task<OutputReadResult> ReadOutputPaneAsync(string paneIdentifier);
+    Task<bool> WriteOutputPaneAsync(string paneIdentifier, string message, bool activate = false);
+    Task<List<OutputPaneInfo>> GetOutputPanesAsync();
 }
 
 /// <summary>

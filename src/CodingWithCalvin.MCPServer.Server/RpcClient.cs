@@ -65,7 +65,7 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
         }
 
         var tools = new List<ToolInfo>();
-        var toolTypes = new[] { typeof(Tools.SolutionTools), typeof(Tools.DocumentTools), typeof(Tools.BuildTools), typeof(Tools.NavigationTools), typeof(Tools.DebuggerTools) };
+        var toolTypes = new[] { typeof(Tools.SolutionTools), typeof(Tools.DocumentTools), typeof(Tools.BuildTools), typeof(Tools.NavigationTools), typeof(Tools.DebuggerTools), typeof(Tools.DiagnosticsTools) };
 
         foreach (var toolType in toolTypes)
         {
@@ -148,4 +148,11 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
     public Task<List<BreakpointInfo>> DebugGetBreakpointsAsync() => Proxy.DebugGetBreakpointsAsync();
     public Task<List<Shared.Models.LocalVariableInfo>> DebugGetLocalsAsync() => Proxy.DebugGetLocalsAsync();
     public Task<List<CallStackFrameInfo>> DebugGetCallStackAsync() => Proxy.DebugGetCallStackAsync();
+
+    public Task<ErrorListResult> GetErrorListAsync(string? severity = null, int maxResults = 100)
+        => Proxy.GetErrorListAsync(severity, maxResults);
+    public Task<OutputReadResult> ReadOutputPaneAsync(string paneIdentifier) => Proxy.ReadOutputPaneAsync(paneIdentifier);
+    public Task<bool> WriteOutputPaneAsync(string paneIdentifier, string message, bool activate = false)
+        => Proxy.WriteOutputPaneAsync(paneIdentifier, message, activate);
+    public Task<List<OutputPaneInfo>> GetOutputPanesAsync() => Proxy.GetOutputPanesAsync();
 }

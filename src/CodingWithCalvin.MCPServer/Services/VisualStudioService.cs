@@ -4,12 +4,22 @@ using System.ComponentModel.Composition;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using CodingWithCalvin.MCPServer.Shared.Models;
 using CodingWithCalvin.Otel4Vsix;
 using EnvDTE;
 using EnvDTE80;
+using Microsoft.VisualStudio;
+using Microsoft.VisualStudio.Editor;
+using Microsoft.VisualStudio.Package;
 using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Shell.Interop;
+using Microsoft.VisualStudio.Shell.TableManager;
+using Microsoft.VisualStudio.Text.Editor;
+
+using Microsoft.VisualStudio.Shell.TableControl;
+using Microsoft.VisualStudio.Shell.TableManager;
 
 namespace CodingWithCalvin.MCPServer.Services;
 
@@ -1477,5 +1487,403 @@ public class VisualStudioService : IVisualStudioService
         }
 
         return results;
+    }
+
+    public async Task<ErrorListResult> GetErrorListAsync(string? severity = null, int maxResults = 100)
+    {
+        var result = new ErrorListResult();
+
+        try
+        {
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            // Get the Error List service
+            var errorListService = ServiceProvider.GetService(typeof(SVsErrorList));
+            if (errorListService == null)
+            {
+                result.Items.Add(new ErrorItemInfo
+                {
+                    Description = "Error List service not available",
+                    Severity = "Message"
+                });
+                return result;
+            }
+
+            // Cast to IErrorList to access the TableControl
+            IErrorList errorList = errorListService as IErrorList;
+            if (errorList == null)
+            {
+                result.Items.Add(new ErrorItemInfo
+                {
+                    Description = "Could not access Error List",
+                    Severity = "Message"
+                });
+                return result;
+            }
+
+            IWpfTableControl tableControl = errorList.TableControl;
+            if (tableControl == null)
+            {
+                result.Items.Add(new ErrorItemInfo
+                {
+                    Description = "Could not access Error List table control",
+                    Severity = "Message"
+                });
+                return result;
+            }
+
+            int count = 0;
+            var severityFilter = severity?.ToLowerInvariant();
+
+            // Enumerate through error list entries
+            foreach (ITableEntryHandle entry in tableControl.Entries)
+            {
+                if (count >= maxResults)
+                    break;
+
+                try
+                {
+                    // Get error properties from the table entry
+                    string errorCode = "";
+                    string projectName = "";
+                    string text = "";
+                    string documentName = "";
+                    int line = 0;
+                    int column = 0;
+                    string severityStr = "Message";
+
+                    // Extract all available properties
+                    if (entry.TryGetValue(StandardTableKeyNames.ErrorCode, out object codeObj))
+                    {
+                        errorCode = codeObj as string ?? "";
+                    }
+
+                    if (entry.TryGetValue(StandardTableKeyNames.ProjectName, out object projectObj))
+                    {
+                        projectName = projectObj as string ?? "";
+                    }
+
+                    if (entry.TryGetValue(StandardTableKeyNames.Text, out object textObj))
+                    {
+                        text = textObj as string ?? "";
+                    }
+
+                    if (entry.TryGetValue(StandardTableKeyNames.DocumentName, out object docObj))
+                    {
+                        documentName = docObj as string ?? "";
+                    }
+
+                    // Get line number
+                    if (entry.TryGetValue(StandardTableKeyNames.Line, out object lineObj) && lineObj is int lineInt)
+                    {
+                        line = lineInt;
+                    }
+
+                    // Get column number
+                    if (entry.TryGetValue(StandardTableKeyNames.Column, out object colObj) && colObj is int colInt)
+                    {
+                        column = colInt;
+                    }
+
+                    // Get error severity
+                    if (entry.TryGetValue(StandardTableKeyNames.ErrorSeverity, out object severityObj) &&
+                        severityObj is __VSERRORCATEGORY errorCategory)
+                    {
+                        severityStr = errorCategory switch
+                        {
+                            __VSERRORCATEGORY.EC_ERROR => "Error",
+                            __VSERRORCATEGORY.EC_WARNING => "Warning",
+                            __VSERRORCATEGORY.EC_MESSAGE => "Message",
+                            _ => "Message"
+                        };
+                    }
+
+                    // Apply severity filter if specified
+                    if (!string.IsNullOrEmpty(severityFilter) &&
+                        !severityStr.Equals(severityFilter, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    // Add the error item to results
+                    result.Items.Add(new ErrorItemInfo
+                    {
+                        FilePath = documentName,
+                        Line = line,
+                        Column = column,
+                        Description = text,
+                        Severity = severityStr,
+                        ErrorCode = errorCode,
+                        Project = projectName
+                    });
+
+                    count++;
+
+                    // Count by severity
+                    if (severityStr == "Error") result.ErrorCount++;
+                    else if (severityStr == "Warning") result.WarningCount++;
+                    else result.MessageCount++;
+                }
+                catch (Exception itemEx)
+                {
+                    VsixTelemetry.TrackException(itemEx);
+                }
+            }
+
+            result.TotalCount = count;
+
+            if (count == 0)
+            {
+                result.Items.Add(new ErrorItemInfo
+                {
+                    Description = "No errors or warnings in the Error List. Build the project to populate the Error List.",
+                    Severity = "Message"
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            VsixTelemetry.TrackException(ex);
+            result.Items.Add(new ErrorItemInfo
+            {
+                Description = $"Error accessing Error List: {ex.Message}",
+                Severity = "Message"
+            });
+        }
+
+        return result;
+    }
+
+    public async Task<List<OutputPaneInfo>> GetOutputPanesAsync()
+    {
+        var panes = new List<OutputPaneInfo>();
+
+        try
+        {
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            var dte = await GetDteAsync();
+
+            if (dte.ToolWindows?.OutputWindow?.OutputWindowPanes != null)
+            {
+                // Enumerate all actual panes in the Output window
+                foreach (EnvDTE.OutputWindowPane pane in dte.ToolWindows.OutputWindow.OutputWindowPanes)
+                {
+                    panes.Add(new OutputPaneInfo
+                    {
+                        Name = pane.Name,
+                        Guid = pane.Guid ?? string.Empty  // Custom panes may not have a GUID
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            VsixTelemetry.TrackException(ex);
+        }
+
+        return panes;
+    }
+
+    public async Task<OutputReadResult> ReadOutputPaneAsync(string paneIdentifier)
+    {
+        var result = new OutputReadResult { PaneName = paneIdentifier };
+
+        try
+        {
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            var dte = await GetDteAsync();
+
+            if (dte.ToolWindows?.OutputWindow == null)
+            {
+                result.Content = "Output window not available";
+                return result;
+            }
+
+            // Find the matching pane by name (works for both well-known and custom panes)
+            EnvDTE.OutputWindowPane targetPane = null;
+
+            foreach (EnvDTE.OutputWindowPane outputPane in dte.ToolWindows.OutputWindow.OutputWindowPanes)
+            {
+                if (outputPane.Name == paneIdentifier)
+                {
+                    targetPane = outputPane;
+                    break;
+                }
+            }
+
+            if (targetPane == null)
+            {
+                result.Content = $"Output pane '{paneIdentifier}' not found";
+                return result;
+            }
+
+            // Read the text using the documented approach:
+            // 1) Get the TextDocument
+            // 2) Get StartPoint and create EditPoint
+            // 3) Call GetText with EndPoint
+            try
+            {
+                // Check if TextDocument is available
+                if (targetPane.TextDocument == null)
+                {
+                    result.Content = $"Output pane '{paneIdentifier}' is empty or not yet initialized. " +
+                        "Trigger an action for this pane (e.g., start debugging, build, or write to it).";
+                    return result;
+                }
+
+                try
+                {
+                    EnvDTE.TextDocument textDoc = targetPane.TextDocument;
+                    EnvDTE.EditPoint startPoint = textDoc.StartPoint.CreateEditPoint();
+                    EnvDTE.TextPoint endPoint = textDoc.EndPoint;
+
+                    string text = startPoint.GetText(endPoint);
+                    result.Content = text;
+                    return result;
+                }
+                catch (System.Runtime.InteropServices.COMException comEx) when (comEx.HResult == unchecked((int)0x80004005))
+                {
+                    // E_FAIL: TextDocument exists but is not accessible (pane not initialized)
+                    result.Content = $"Output pane '{paneIdentifier}' is not yet initialized. " +
+                        "Trigger an action for this pane to generate content.";
+                    return result;
+                }
+            }
+            catch (Exception innerEx)
+            {
+                result.Content = $"Could not read TextDocument: {innerEx.Message}";
+                return result;
+            }
+        }
+        catch (Exception ex)
+        {
+            VsixTelemetry.TrackException(ex);
+            result.Content = $"Error reading output pane: {ex.Message}";
+        }
+
+        return result;
+    }
+
+    public async Task<bool> WriteOutputPaneAsync(string paneIdentifier, string message, bool activate = false)
+    {
+        try
+        {
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            var outputWindow = ServiceProvider.GetService(typeof(SVsOutputWindow)) as IVsOutputWindow;
+            if (outputWindow == null)
+            {
+                return false;
+            }
+
+            // Parse identifier as GUID or name
+            Guid paneGuid = Guid.Empty;
+            bool isCustomPane = false;
+
+            if (Guid.TryParse(paneIdentifier, out var parsedGuid))
+            {
+                paneGuid = parsedGuid;
+                isCustomPane = !IsWellKnownPane(paneGuid);
+            }
+            else
+            {
+                // Map well-known names to GUIDs
+                paneGuid = paneIdentifier.ToLowerInvariant() switch
+                {
+                    "build" => VSConstants.OutputWindowPaneGuid.BuildOutputPane_guid,
+                    "debug" => VSConstants.OutputWindowPaneGuid.DebugPane_guid,
+                    "general" => VSConstants.OutputWindowPaneGuid.GeneralPane_guid,
+                    _ => Guid.NewGuid()  // Create custom pane with new GUID
+                };
+
+                isCustomPane = paneIdentifier.ToLowerInvariant() switch
+                {
+                    "build" or "debug" or "general" => false,
+                    _ => true
+                };
+            }
+
+            // Try to get existing pane
+            var paneGuidRef = paneGuid;
+            int hr = outputWindow.GetPane(ref paneGuidRef, out IVsOutputWindowPane? pane);
+
+            // If pane doesn't exist and it's a custom pane, create it
+            if (hr != 0 && isCustomPane)
+            {
+                hr = outputWindow.CreatePane(ref paneGuid, paneIdentifier, 1, 1);
+                if (hr != 0)
+                {
+                    return false;
+                }
+
+                // Get the newly created pane
+                paneGuidRef = paneGuid;
+                hr = outputWindow.GetPane(ref paneGuidRef, out pane);
+                if (hr != 0 || pane == null)
+                {
+                    return false;
+                }
+            }
+            else if (hr != 0 || pane == null)
+            {
+                // System pane not found - don't create
+                return false;
+            }
+
+            // Write message to pane
+            pane.OutputStringThreadSafe(message + "\r\n");
+
+            // Activate pane if requested
+            if (activate)
+            {
+                pane.Activate();
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            VsixTelemetry.TrackException(ex);
+            return false;
+        }
+    }
+
+    private IVsOutputWindowPane? GetPaneByIdentifier(IVsOutputWindow outputWindow, string paneIdentifier)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        if (Guid.TryParse(paneIdentifier, out var paneGuid))
+        {
+            var guidRef = paneGuid;
+            outputWindow.GetPane(ref guidRef, out var pane);
+            return pane;
+        }
+
+        // Map well-known names
+        var guid = paneIdentifier.ToLowerInvariant() switch
+        {
+            "build" => VSConstants.OutputWindowPaneGuid.BuildOutputPane_guid,
+            "debug" => VSConstants.OutputWindowPaneGuid.DebugPane_guid,
+            "general" => VSConstants.OutputWindowPaneGuid.GeneralPane_guid,
+            _ => Guid.Empty
+        };
+
+        if (guid != Guid.Empty)
+        {
+            var guidRef = guid;
+            outputWindow.GetPane(ref guidRef, out var pane);
+            return pane;
+        }
+
+        return null;
+    }
+
+    private bool IsWellKnownPane(Guid paneGuid)
+    {
+        return paneGuid == VSConstants.OutputWindowPaneGuid.BuildOutputPane_guid ||
+               paneGuid == VSConstants.OutputWindowPaneGuid.DebugPane_guid ||
+               paneGuid == VSConstants.OutputWindowPaneGuid.GeneralPane_guid;
     }
 }
