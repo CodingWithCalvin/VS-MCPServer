@@ -140,19 +140,35 @@ Download the latest `.vsix` from the [Releases](https://github.com/CodingWithCal
 2. Go to **Tools > MCP Server > Start Server** (or enable auto-start in settings)
 3. The MCP server starts on `http://localhost:5050`
 
-### 🤖 Configuring Claude Desktop
+### 🤖 Configuring Claude Desktop & Claude Code
 
-Add this to your Claude Desktop MCP settings:
+Add this to your Claude Desktop or Claude Code MCP settings (preferred HTTP method):
 
 ```json
 {
   "mcpServers": {
-    "visual-studio": {
+    "visualstudio": {
+      "type": "http",
+      "url": "http://localhost:5050"
+    }
+  }
+}
+```
+
+**Legacy SSE method** (deprecated, but still supported):
+
+```json
+{
+  "mcpServers": {
+    "visualstudio": {
+      "type": "sse",
       "url": "http://localhost:5050/sse"
     }
   }
 }
 ```
+
+> ℹ️ **Note:** The HTTP method is the preferred standard. SSE (Server-Sent Events) is a legacy protocol and should only be used for backward compatibility.
 
 ### ⚙️ Settings
 
