@@ -16,10 +16,8 @@ using Microsoft.VisualStudio.Package;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.VisualStudio.Shell.TableManager;
-using Microsoft.VisualStudio.Text.Editor;
-
 using Microsoft.VisualStudio.Shell.TableControl;
-using Microsoft.VisualStudio.Shell.TableManager;
+using Microsoft.VisualStudio.Text.Editor;
 
 namespace CodingWithCalvin.MCPServer.Services;
 
@@ -1539,7 +1537,7 @@ public class VisualStudioService : IVisualStudioService
             }
 
             // Cast to IErrorList to access the TableControl
-            IErrorList errorList = errorListService as IErrorList;
+            IErrorList? errorList = errorListService as IErrorList;
             if (errorList == null)
             {
                 result.Items.Add(new ErrorItemInfo
@@ -1731,7 +1729,7 @@ public class VisualStudioService : IVisualStudioService
             }
 
             // Find the matching pane by name (works for both well-known and custom panes)
-            EnvDTE.OutputWindowPane targetPane = null;
+            EnvDTE.OutputWindowPane? targetPane = null;
 
             foreach (EnvDTE.OutputWindowPane outputPane in dte.ToolWindows.OutputWindow.OutputWindowPanes)
             {

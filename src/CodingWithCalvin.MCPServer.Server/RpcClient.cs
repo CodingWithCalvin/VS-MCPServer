@@ -96,8 +96,10 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
 
     public Task ShutdownAsync()
     {
+#pragma warning disable VSTHRD103 // Console.Error.WriteLine is fine in console app context
         Console.Error.WriteLine("Shutdown requested via RPC");
         _shutdownCts.Cancel();
+#pragma warning restore VSTHRD103
         return Task.CompletedTask;
     }
 

@@ -5,6 +5,8 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <RootNamespace>CodingWithCalvin.MCPServer</RootNamespace>
+    <!-- Suppress VS-Threading analyzer warnings that are architectural decisions or false positives in VSIX context -->
+    <NoWarn>$(NoWarn);VSTHRD002;VSTHRD003;VSTHRD010;VSTHRD110;VSSDK007</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
