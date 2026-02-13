@@ -97,7 +97,8 @@ static async Task RunServerAsync(string pipeName, string host, int port, string 
     .WithTools<SolutionTools>()
     .WithTools<DocumentTools>()
     .WithTools<BuildTools>()
-    .WithTools<NavigationTools>();
+    .WithTools<NavigationTools>()
+    .WithTools<DebuggerTools>();
 
     var app = builder.Build();
 

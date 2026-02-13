@@ -35,4 +35,20 @@ public interface IVisualStudioService
     Task<WorkspaceSymbolResult> SearchWorkspaceSymbolsAsync(string query, int maxResults = 100);
     Task<DefinitionResult> GoToDefinitionAsync(string path, int line, int column);
     Task<ReferencesResult> FindReferencesAsync(string path, int line, int column, int maxResults = 100);
+
+    Task<DebuggerStatus> GetDebuggerStatusAsync();
+    Task<bool> DebugLaunchAsync();
+    Task<bool> DebugLaunchWithoutDebuggingAsync();
+    Task<bool> DebugContinueAsync();
+    Task<bool> DebugBreakAsync();
+    Task<bool> DebugStopAsync();
+    Task<bool> DebugStepOverAsync();
+    Task<bool> DebugStepIntoAsync();
+    Task<bool> DebugStepOutAsync();
+
+    Task<bool> DebugAddBreakpointAsync(string file, int line);
+    Task<bool> DebugRemoveBreakpointAsync(string file, int line);
+    Task<List<BreakpointInfo>> DebugGetBreakpointsAsync();
+    Task<List<LocalVariableInfo>> DebugGetLocalsAsync();
+    Task<List<CallStackFrameInfo>> DebugGetCallStackAsync();
 }

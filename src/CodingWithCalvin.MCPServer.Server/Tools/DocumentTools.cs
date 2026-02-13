@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -65,10 +66,42 @@ public class DocumentTools
     [McpServerTool(Name = "document_read", ReadOnly = true)]
     [Description("Read the contents of a document. If the document is open in VS, reads the current editor buffer (including unsaved changes); otherwise reads from disk.")]
     public async Task<string> ReadDocumentAsync(
-        [Description("The full absolute path to the document. Supports forward slashes (/) or backslashes (\\).")] string path)
+        [Description("The full absolute path to the document. Supports forward slashes (/) or backslashes (\\).")] string path,
+        [Description("The line number to start reading from (1-based). Defaults to 1.")] int offset = 1,
+        [Description("Maximum number of lines to read. Defaults to 500. Use smaller values for large files.")] int limit = 500)
     {
         var content = await _rpcClient.ReadDocumentAsync(path);
-        return content ?? $"Could not read document: {path}";
+        if (content == null)
+        {
+            return $"Could not read document: {path}";
+        }
+
+        var lines = content.Split('\n');
+        var totalLines = lines.Length;
+        var startIndex = Math.Max(0, offset - 1);
+        var count = Math.Min(limit, totalLines - startIndex);
+
+        if (startIndex >= totalLines)
+        {
+            return $"Offset {offset} is beyond end of file ({totalLines} lines)";
+        }
+
+        var selectedLines = new string[count];
+        Array.Copy(lines, startIndex, selectedLines, 0, count);
+
+        var result = new System.Text.StringBuilder();
+        for (int i = 0; i < selectedLines.Length; i++)
+        {
+            result.AppendLine($"{startIndex + i + 1}\t{selectedLines[i].TrimEnd('\r')}");
+        }
+
+        var header = $"Lines {startIndex + 1}-{startIndex + count} of {totalLines}";
+        if (startIndex + count < totalLines)
+        {
+            header += $" (use offset={startIndex + count + 1} to read more)";
+        }
+
+        return $"{header}\n{result}";
     }
 
     [McpServerTool(Name = "document_write", Destructive = true)]
