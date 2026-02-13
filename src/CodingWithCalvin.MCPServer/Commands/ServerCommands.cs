@@ -154,6 +154,11 @@ internal sealed class ServerCommands
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
+            if (MCPServerPackage.Instance == null)
+            {
+                return;
+            }
+
             if (MCPServerPackage.RpcServer == null || !MCPServerPackage.RpcServer.IsConnected)
             {
                 VsShellUtilities.ShowMessageBox(
