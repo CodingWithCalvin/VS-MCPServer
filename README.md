@@ -82,6 +82,43 @@
 | `build_cancel` | Cancel a running build |
 | `build_status` | Get current build status |
 
+### 🧭 Navigation Tools
+
+| Tool | Description |
+|------|-------------|
+| `goto_definition` | Navigate to the definition of a symbol |
+| `find_references` | Find all references to a symbol |
+| `symbol_document` | Get all symbols defined in a document |
+| `symbol_workspace` | Search for symbols across the solution |
+
+### 🐛 Debugger Tools
+
+| Tool | Description |
+|------|-------------|
+| `debugger_status` | Get current debugger state |
+| `debugger_launch` | Start debugging (F5) |
+| `debugger_launch_without_debugging` | Start without debugger (Ctrl+F5) |
+| `debugger_continue` | Continue execution (F5) |
+| `debugger_break` | Pause execution (Ctrl+Alt+Break) |
+| `debugger_stop` | Stop debugging (Shift+F5) |
+| `debugger_step_over` | Step over (F10) |
+| `debugger_step_into` | Step into (F11) |
+| `debugger_step_out` | Step out (Shift+F11) |
+| `debugger_add_breakpoint` | Add a breakpoint at a file and line |
+| `debugger_remove_breakpoint` | Remove a breakpoint |
+| `debugger_list_breakpoints` | List all breakpoints |
+| `debugger_get_locals` | Get local variables in current frame |
+| `debugger_get_callstack` | Get the call stack |
+
+### 🔍 Diagnostics Tools
+
+| Tool | Description |
+|------|-------------|
+| `errors_list` | Read build errors, warnings, and messages from the Error List |
+| `output_read` | Read content from an Output window pane |
+| `output_write` | Write a message to an Output window pane |
+| `output_list_panes` | List all available Output window panes |
+
 ## 🛠️ Installation
 
 ### Visual Studio Marketplace
@@ -103,19 +140,35 @@ Download the latest `.vsix` from the [Releases](https://github.com/CodingWithCal
 2. Go to **Tools > MCP Server > Start Server** (or enable auto-start in settings)
 3. The MCP server starts on `http://localhost:5050`
 
-### 🤖 Configuring Claude Desktop
+### 🤖 Configuring Claude Desktop & Claude Code
 
-Add this to your Claude Desktop MCP settings:
+Add this to your Claude Desktop or Claude Code MCP settings (preferred HTTP method):
 
 ```json
 {
   "mcpServers": {
-    "visual-studio": {
+    "visualstudio": {
+      "type": "http",
+      "url": "http://localhost:5050"
+    }
+  }
+}
+```
+
+**Legacy SSE method** (deprecated, but still supported):
+
+```json
+{
+  "mcpServers": {
+    "visualstudio": {
+      "type": "sse",
       "url": "http://localhost:5050/sse"
     }
   }
 }
 ```
+
+> ℹ️ **Note:** The HTTP method is the preferred standard. SSE (Server-Sent Events) is a legacy protocol and should only be used for backward compatibility.
 
 ### ⚙️ Settings
 

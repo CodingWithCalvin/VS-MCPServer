@@ -57,6 +57,7 @@ return await rootCommand.InvokeAsync(args);
 
 static async Task RunServerAsync(string pipeName, string host, int port, string serverName, string logLevel)
 {
+#pragma warning disable VSTHRD103 // Console.Error.WriteLine is appropriate in console app context
     // Parse log level
     var msLogLevel = logLevel switch
     {
@@ -97,7 +98,9 @@ static async Task RunServerAsync(string pipeName, string host, int port, string 
     .WithTools<SolutionTools>()
     .WithTools<DocumentTools>()
     .WithTools<BuildTools>()
-    .WithTools<NavigationTools>();
+    .WithTools<NavigationTools>()
+    .WithTools<DebuggerTools>()
+    .WithTools<DiagnosticsTools>();
 
     var app = builder.Build();
 
@@ -115,4 +118,5 @@ static async Task RunServerAsync(string pipeName, string host, int port, string 
     await app.RunAsync();
 
     Console.Error.WriteLine("Server shutdown complete");
+#pragma warning restore VSTHRD103
 }
