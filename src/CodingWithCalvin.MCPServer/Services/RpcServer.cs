@@ -192,4 +192,27 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
         => _vsService.GoToDefinitionAsync(path, line, column);
     public Task<ReferencesResult> FindReferencesAsync(string path, int line, int column, int maxResults = 100)
         => _vsService.FindReferencesAsync(path, line, column, maxResults);
+
+    public Task<DebuggerStatus> GetDebuggerStatusAsync() => _vsService.GetDebuggerStatusAsync();
+    public Task<bool> DebugLaunchAsync() => _vsService.DebugLaunchAsync();
+    public Task<bool> DebugLaunchWithoutDebuggingAsync() => _vsService.DebugLaunchWithoutDebuggingAsync();
+    public Task<bool> DebugContinueAsync() => _vsService.DebugContinueAsync();
+    public Task<bool> DebugBreakAsync() => _vsService.DebugBreakAsync();
+    public Task<bool> DebugStopAsync() => _vsService.DebugStopAsync();
+    public Task<bool> DebugStepOverAsync() => _vsService.DebugStepOverAsync();
+    public Task<bool> DebugStepIntoAsync() => _vsService.DebugStepIntoAsync();
+    public Task<bool> DebugStepOutAsync() => _vsService.DebugStepOutAsync();
+
+    public Task<bool> DebugAddBreakpointAsync(string file, int line) => _vsService.DebugAddBreakpointAsync(file, line);
+    public Task<bool> DebugRemoveBreakpointAsync(string file, int line) => _vsService.DebugRemoveBreakpointAsync(file, line);
+    public Task<List<BreakpointInfo>> DebugGetBreakpointsAsync() => _vsService.DebugGetBreakpointsAsync();
+    public Task<List<LocalVariableInfo>> DebugGetLocalsAsync() => _vsService.DebugGetLocalsAsync();
+    public Task<List<CallStackFrameInfo>> DebugGetCallStackAsync() => _vsService.DebugGetCallStackAsync();
+
+    public Task<ErrorListResult> GetErrorListAsync(string? severity = null, int maxResults = 100)
+        => _vsService.GetErrorListAsync(severity, maxResults);
+    public Task<OutputReadResult> ReadOutputPaneAsync(string paneIdentifier) => _vsService.ReadOutputPaneAsync(paneIdentifier);
+    public Task<bool> WriteOutputPaneAsync(string paneIdentifier, string message, bool activate = false)
+        => _vsService.WriteOutputPaneAsync(paneIdentifier, message, activate);
+    public Task<List<OutputPaneInfo>> GetOutputPanesAsync() => _vsService.GetOutputPanesAsync();
 }

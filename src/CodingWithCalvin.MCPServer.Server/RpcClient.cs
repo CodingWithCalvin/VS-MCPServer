@@ -65,7 +65,7 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
         }
 
         var tools = new List<ToolInfo>();
-        var toolTypes = new[] { typeof(Tools.SolutionTools), typeof(Tools.DocumentTools), typeof(Tools.BuildTools), typeof(Tools.NavigationTools) };
+        var toolTypes = new[] { typeof(Tools.SolutionTools), typeof(Tools.DocumentTools), typeof(Tools.BuildTools), typeof(Tools.NavigationTools), typeof(Tools.DebuggerTools), typeof(Tools.DiagnosticsTools) };
 
         foreach (var toolType in toolTypes)
         {
@@ -132,4 +132,27 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
         => Proxy.GoToDefinitionAsync(path, line, column);
     public Task<ReferencesResult> FindReferencesAsync(string path, int line, int column, int maxResults = 100)
         => Proxy.FindReferencesAsync(path, line, column, maxResults);
+
+    public Task<DebuggerStatus> GetDebuggerStatusAsync() => Proxy.GetDebuggerStatusAsync();
+    public Task<bool> DebugLaunchAsync() => Proxy.DebugLaunchAsync();
+    public Task<bool> DebugLaunchWithoutDebuggingAsync() => Proxy.DebugLaunchWithoutDebuggingAsync();
+    public Task<bool> DebugContinueAsync() => Proxy.DebugContinueAsync();
+    public Task<bool> DebugBreakAsync() => Proxy.DebugBreakAsync();
+    public Task<bool> DebugStopAsync() => Proxy.DebugStopAsync();
+    public Task<bool> DebugStepOverAsync() => Proxy.DebugStepOverAsync();
+    public Task<bool> DebugStepIntoAsync() => Proxy.DebugStepIntoAsync();
+    public Task<bool> DebugStepOutAsync() => Proxy.DebugStepOutAsync();
+
+    public Task<bool> DebugAddBreakpointAsync(string file, int line) => Proxy.DebugAddBreakpointAsync(file, line);
+    public Task<bool> DebugRemoveBreakpointAsync(string file, int line) => Proxy.DebugRemoveBreakpointAsync(file, line);
+    public Task<List<BreakpointInfo>> DebugGetBreakpointsAsync() => Proxy.DebugGetBreakpointsAsync();
+    public Task<List<Shared.Models.LocalVariableInfo>> DebugGetLocalsAsync() => Proxy.DebugGetLocalsAsync();
+    public Task<List<CallStackFrameInfo>> DebugGetCallStackAsync() => Proxy.DebugGetCallStackAsync();
+
+    public Task<ErrorListResult> GetErrorListAsync(string? severity = null, int maxResults = 100)
+        => Proxy.GetErrorListAsync(severity, maxResults);
+    public Task<OutputReadResult> ReadOutputPaneAsync(string paneIdentifier) => Proxy.ReadOutputPaneAsync(paneIdentifier);
+    public Task<bool> WriteOutputPaneAsync(string paneIdentifier, string message, bool activate = false)
+        => Proxy.WriteOutputPaneAsync(paneIdentifier, message, activate);
+    public Task<List<OutputPaneInfo>> GetOutputPanesAsync() => Proxy.GetOutputPanesAsync();
 }
