@@ -371,7 +371,7 @@ public class VisualStudioService : IVisualStudioService
         return true;
     }
 
-    public async Task<bool> ReplaceTextAsync(string oldText, string newText)
+    public async Task<int> ReplaceTextAsync(string oldText, string newText)
     {
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
         var dte = await GetDteAsync();
@@ -379,27 +379,32 @@ public class VisualStudioService : IVisualStudioService
         var doc = dte.ActiveDocument;
         if (doc == null)
         {
-            return false;
+            return 0;
         }
 
         var textDoc = doc.Object("TextDocument") as TextDocument;
         if (textDoc == null)
         {
-            return false;
+            return 0;
         }
 
-        var editPoint = textDoc.StartPoint.CreateEditPoint();
-        var content = editPoint.GetText(textDoc.EndPoint);
-        var newContent = content.Replace(oldText, newText);
+        var count = 0;
+        var searchPoint = textDoc.StartPoint.CreateEditPoint();
+        EditPoint matchEnd = null;
 
-        if (content != newContent)
+        while (searchPoint.FindPattern(oldText, (int)vsFindOptions.vsFindOptionsMatchCase, ref matchEnd))
         {
-            editPoint.Delete(textDoc.EndPoint);
-            editPoint.Insert(newContent);
-            return true;
+            count++;
+            searchPoint = matchEnd;
         }
 
-        return false;
+        if (count > 0)
+        {
+            TextRanges tags = null;
+            textDoc.ReplacePattern(oldText, newText, (int)vsFindOptions.vsFindOptionsMatchCase, ref tags);
+        }
+
+        return count;
     }
 
     public async Task<bool> GoToLineAsync(int line)

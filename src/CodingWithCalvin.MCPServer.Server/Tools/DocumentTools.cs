@@ -164,8 +164,8 @@ public class DocumentTools
         [Description("The exact text to find (case-sensitive).")] string oldText,
         [Description("The replacement text. Use empty string to delete matches.")] string newText)
     {
-        var success = await _rpcClient.ReplaceTextAsync(oldText, newText);
-        return success ? "Text replaced" : "Text not found or no active document";
+        var count = await _rpcClient.ReplaceTextAsync(oldText, newText);
+        return count > 0 ? $"Replaced {count} occurrence(s)" : "Text not found or no active document";
     }
 
     [McpServerTool(Name = "editor_goto_line", Destructive = false, Idempotent = true)]

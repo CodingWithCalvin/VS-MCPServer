@@ -22,7 +22,7 @@ public interface IVisualStudioService
     Task<bool> SetSelectionAsync(string path, int startLine, int startColumn, int endLine, int endColumn);
 
     Task<bool> InsertTextAsync(string text);
-    Task<bool> ReplaceTextAsync(string oldText, string newText);
+    Task<int> ReplaceTextAsync(string oldText, string newText);
     Task<bool> GoToLineAsync(int line);
     Task<List<FindResult>> FindAsync(string searchText, bool matchCase = false, bool wholeWord = false);
 

@@ -176,7 +176,7 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
     public Task<bool> SetSelectionAsync(string path, int startLine, int startColumn, int endLine, int endColumn)
         => _vsService.SetSelectionAsync(path, startLine, startColumn, endLine, endColumn);
     public Task<bool> InsertTextAsync(string text) => _vsService.InsertTextAsync(text);
-    public Task<bool> ReplaceTextAsync(string oldText, string newText) => _vsService.ReplaceTextAsync(oldText, newText);
+    public Task<int> ReplaceTextAsync(string oldText, string newText) => _vsService.ReplaceTextAsync(oldText, newText);
     public Task<bool> GoToLineAsync(int line) => _vsService.GoToLineAsync(line);
     public Task<List<FindResult>> FindAsync(string searchText, bool matchCase, bool wholeWord)
         => _vsService.FindAsync(searchText, matchCase, wholeWord);
