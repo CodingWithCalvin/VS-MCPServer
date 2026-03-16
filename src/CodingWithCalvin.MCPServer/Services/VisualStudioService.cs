@@ -398,7 +398,7 @@ public class VisualStudioService : IVisualStudioService
 
         var count = 0;
         var searchPoint = textDoc.StartPoint.CreateEditPoint();
-        EditPoint matchEnd = null;
+        EditPoint? matchEnd = null;
 
         while (searchPoint.FindPattern(oldText, (int)vsFindOptions.vsFindOptionsMatchCase, ref matchEnd))
         {
@@ -408,7 +408,7 @@ public class VisualStudioService : IVisualStudioService
 
         if (count > 0)
         {
-            TextRanges tags = null;
+            TextRanges? tags = null;
             textDoc.ReplacePattern(oldText, newText, (int)vsFindOptions.vsFindOptionsMatchCase, ref tags);
         }
 
