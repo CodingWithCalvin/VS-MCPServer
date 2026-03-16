@@ -109,6 +109,7 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
     public Task<DocumentInfo?> GetActiveDocumentAsync() => Proxy.GetActiveDocumentAsync();
     public Task<bool> OpenDocumentAsync(string path) => Proxy.OpenDocumentAsync(path);
     public Task<bool> CloseDocumentAsync(string path, bool save) => Proxy.CloseDocumentAsync(path, save);
+    public Task<bool> SaveDocumentAsync(string path) => Proxy.SaveDocumentAsync(path);
     public Task<string?> ReadDocumentAsync(string path) => Proxy.ReadDocumentAsync(path);
     public Task<bool> WriteDocumentAsync(string path, string content) => Proxy.WriteDocumentAsync(path, content);
     public Task<SelectionInfo?> GetSelectionAsync() => Proxy.GetSelectionAsync();

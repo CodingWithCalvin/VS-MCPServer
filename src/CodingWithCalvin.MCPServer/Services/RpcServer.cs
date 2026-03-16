@@ -169,6 +169,7 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
     public Task<DocumentInfo?> GetActiveDocumentAsync() => _vsService.GetActiveDocumentAsync();
     public Task<bool> OpenDocumentAsync(string path) => _vsService.OpenDocumentAsync(path);
     public Task<bool> CloseDocumentAsync(string path, bool save) => _vsService.CloseDocumentAsync(path, save);
+    public Task<bool> SaveDocumentAsync(string path) => _vsService.SaveDocumentAsync(path);
     public Task<string?> ReadDocumentAsync(string path) => _vsService.ReadDocumentAsync(path);
     public Task<bool> WriteDocumentAsync(string path, string content) => _vsService.WriteDocumentAsync(path, content);
     public Task<SelectionInfo?> GetSelectionAsync() => _vsService.GetSelectionAsync();

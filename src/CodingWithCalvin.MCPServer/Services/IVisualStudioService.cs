@@ -15,6 +15,7 @@ public interface IVisualStudioService
     Task<DocumentInfo?> GetActiveDocumentAsync();
     Task<bool> OpenDocumentAsync(string path);
     Task<bool> CloseDocumentAsync(string path, bool save = true);
+    Task<bool> SaveDocumentAsync(string path);
     Task<string?> ReadDocumentAsync(string path);
     Task<bool> WriteDocumentAsync(string path, string content);
     Task<SelectionInfo?> GetSelectionAsync();

@@ -63,6 +63,15 @@ public class DocumentTools
         return success ? $"Closed: {path}" : $"Document not found or failed to close: {path}";
     }
 
+    [McpServerTool(Name = "document_save", Destructive = false, Idempotent = true)]
+    [Description("Save an open document in Visual Studio to disk.")]
+    public async Task<string> SaveDocumentAsync(
+        [Description("The full absolute path to the document. Must be open in VS. Get the path from document_list. Supports forward slashes (/) or backslashes (\\).")] string path)
+    {
+        var success = await _rpcClient.SaveDocumentAsync(path);
+        return success ? $"Saved: {path}" : $"Document not found or failed to save: {path}";
+    }
+
     [McpServerTool(Name = "document_read", ReadOnly = true)]
     [Description("Read the contents of a document. If the document is open in VS, reads the current editor buffer (including unsaved changes); otherwise reads from disk.")]
     public async Task<string> ReadDocumentAsync(

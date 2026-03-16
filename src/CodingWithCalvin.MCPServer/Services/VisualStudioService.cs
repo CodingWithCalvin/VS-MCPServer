@@ -205,6 +205,30 @@ public class VisualStudioService : IVisualStudioService
         return false;
     }
 
+    public async Task<bool> SaveDocumentAsync(string path)
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+
+        foreach (Document doc in dte.Documents)
+        {
+            try
+            {
+                if (PathsEqual(doc.FullName, path))
+                {
+                    doc.Save();
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                VsixTelemetry.TrackException(ex);
+            }
+        }
+
+        return false;
+    }
+
     public async Task<string?> ReadDocumentAsync(string path)
     {
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
