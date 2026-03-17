@@ -60,6 +60,7 @@
 | `document_close` | Close a document |
 | `document_read` | Read document contents |
 | `document_write` | Write to a document |
+| `document_save` | Saves an open document |
 
 ### ✏️ Editor Tools
 
