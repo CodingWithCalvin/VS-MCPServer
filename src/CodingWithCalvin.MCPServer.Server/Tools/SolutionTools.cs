@@ -61,6 +61,23 @@ public class SolutionTools
         return JsonSerializer.Serialize(projects, _jsonOptions);
     }
 
+    [McpServerTool(Name = "startup_project_get", ReadOnly = true)]
+    [Description("Get the current startup project name. Returns the project that will be launched when debugging starts.")]
+    public async Task<string> GetStartupProjectAsync()
+    {
+        var startupProject = await _rpcClient.GetStartupProjectAsync();
+        return startupProject ?? "No startup project is set";
+    }
+
+    [McpServerTool(Name = "startup_project_set", Destructive = false)]
+    [Description("Set the startup project for debugging. Use project_list to get available project names.")]
+    public async Task<string> SetStartupProjectAsync(
+        [Description("The display name of the project to set as the startup project (e.g., 'MyProject'). Use project_list to see available project names.")] string name)
+    {
+        var success = await _rpcClient.SetStartupProjectAsync(name);
+        return success ? $"Startup project set to: {name}" : $"Failed to set startup project: {name}";
+    }
+
     [McpServerTool(Name = "project_info", ReadOnly = true)]
     [Description("Get detailed information about a specific project by its display name.")]
     public async Task<string> GetProjectInfoAsync(

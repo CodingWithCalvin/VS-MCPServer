@@ -1144,6 +1144,157 @@ public class VisualStudioService : IVisualStudioService
         return status;
     }
 
+    public async Task<string?> GetStartupProjectAsync()
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+
+        try
+        {
+            if (dte.Solution?.SolutionBuild?.StartupProjects is Array startupProjects && startupProjects.Length > 0)
+            {
+                return startupProjects.GetValue(0) as string;
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            VsixTelemetry.TrackException(ex);
+            return null;
+        }
+    }
+
+    public async Task<bool> SetStartupProjectAsync(string projectName)
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("SetStartupProject");
+
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+
+        try
+        {
+            dte.Solution.SolutionBuild.StartupProjects = projectName;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            return false;
+        }
+    }
+
+    public async Task<bool> DebugLaunchProjectAsync(string projectName, bool noDebug)
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("DebugLaunchProject");
+
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+
+        try
+        {
+            EnvDTE.Project? targetProject = null;
+
+            foreach (EnvDTE.Project project in dte.Solution.Projects)
+            {
+                targetProject = FindProjectByName(project, projectName);
+                if (targetProject != null)
+                {
+                    break;
+                }
+            }
+
+            if (targetProject == null)
+            {
+                return false;
+            }
+
+            var solution = ServiceProvider.GetService(typeof(SVsSolution)) as IVsSolution;
+            if (solution == null)
+            {
+                return false;
+            }
+
+            ErrorHandler.ThrowOnFailure(
+                solution.GetProjectOfUniqueName(targetProject.UniqueName, out var hierarchy));
+
+            if (hierarchy is not IVsGetCfgProvider getCfgProvider)
+            {
+                return false;
+            }
+
+            ErrorHandler.ThrowOnFailure(getCfgProvider.GetCfgProvider(out var cfgProvider));
+
+            if (cfgProvider is not IVsCfgProvider2 cfgProvider2)
+            {
+                return false;
+            }
+
+            var configName = targetProject.ConfigurationManager.ActiveConfiguration.ConfigurationName;
+            var platformName = targetProject.ConfigurationManager.ActiveConfiguration.PlatformName;
+
+            ErrorHandler.ThrowOnFailure(
+                cfgProvider2.GetCfgOfName(configName, platformName, out var cfg));
+
+            if (cfg is not IVsDebuggableProjectCfg debuggableProjectCfg)
+            {
+                return false;
+            }
+
+            var launchFlags = noDebug
+                ? (uint)__VSDBGLAUNCHFLAGS.DBGLAUNCH_NoDebug
+                : 0u;
+
+            ErrorHandler.ThrowOnFailure(debuggableProjectCfg.DebugLaunch(launchFlags));
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            return false;
+        }
+    }
+
+    private static EnvDTE.Project? FindProjectByName(EnvDTE.Project project, string name)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        try
+        {
+            if (project.Kind == ProjectKinds.vsProjectKindSolutionFolder)
+            {
+                if (project.ProjectItems != null)
+                {
+                    foreach (ProjectItem item in project.ProjectItems)
+                    {
+                        if (item.SubProject != null)
+                        {
+                            var found = FindProjectByName(item.SubProject, name);
+                            if (found != null)
+                            {
+                                return found;
+                            }
+                        }
+                    }
+                }
+
+                return null;
+            }
+
+            return string.Equals(project.Name, name, StringComparison.OrdinalIgnoreCase)
+                ? project
+                : null;
+        }
+        catch (Exception ex)
+        {
+            VsixTelemetry.TrackException(ex);
+            return null;
+        }
+    }
+
     public async Task<bool> DebugLaunchAsync()
     {
         using var activity = VsixTelemetry.Tracer.StartActivity("DebugLaunch");

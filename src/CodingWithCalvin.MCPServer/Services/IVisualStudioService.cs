@@ -38,7 +38,10 @@ public interface IVisualStudioService
     Task<ReferencesResult> FindReferencesAsync(string path, int line, int column, int maxResults = 100);
 
     Task<DebuggerStatus> GetDebuggerStatusAsync();
+    Task<string?> GetStartupProjectAsync();
+    Task<bool> SetStartupProjectAsync(string projectName);
     Task<bool> DebugLaunchAsync();
+    Task<bool> DebugLaunchProjectAsync(string projectName, bool noDebug);
     Task<bool> DebugLaunchWithoutDebuggingAsync();
     Task<bool> DebugContinueAsync();
     Task<bool> DebugBreakAsync();

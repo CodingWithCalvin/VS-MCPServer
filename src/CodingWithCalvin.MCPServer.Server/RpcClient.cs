@@ -137,7 +137,10 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
         => Proxy.FindReferencesAsync(path, line, column, maxResults);
 
     public Task<DebuggerStatus> GetDebuggerStatusAsync() => Proxy.GetDebuggerStatusAsync();
+    public Task<string?> GetStartupProjectAsync() => Proxy.GetStartupProjectAsync();
+    public Task<bool> SetStartupProjectAsync(string projectName) => Proxy.SetStartupProjectAsync(projectName);
     public Task<bool> DebugLaunchAsync() => Proxy.DebugLaunchAsync();
+    public Task<bool> DebugLaunchProjectAsync(string projectName, bool noDebug) => Proxy.DebugLaunchProjectAsync(projectName, noDebug);
     public Task<bool> DebugLaunchWithoutDebuggingAsync() => Proxy.DebugLaunchWithoutDebuggingAsync();
     public Task<bool> DebugContinueAsync() => Proxy.DebugContinueAsync();
     public Task<bool> DebugBreakAsync() => Proxy.DebugBreakAsync();

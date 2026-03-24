@@ -26,19 +26,41 @@ public class DebuggerTools
     }
 
     [McpServerTool(Name = "debugger_launch", Destructive = false)]
-    [Description("Start debugging the current startup project (equivalent to F5). A solution must be open with a valid startup project configured. Use debugger_status to check the resulting state.")]
-    public async Task<string> DebugLaunchAsync()
+    [Description("Start debugging a project (equivalent to F5). If projectName is specified, launches that specific project without changing the startup project. Otherwise debugs the current startup project. A solution must be open. Use debugger_status to check the resulting state.")]
+    public async Task<string> DebugLaunchAsync(
+        [Description("Optional: The display name of the project to debug (e.g., 'MyProject'). Launches this project directly without changing the startup project. Use project_list to see available project names.")] string? projectName = null)
     {
-        var success = await _rpcClient.DebugLaunchAsync();
-        return success ? "Debugging started" : "Failed to start debugging (is a solution open with a startup project configured?)";
+        if (projectName != null)
+        {
+            var success = await _rpcClient.DebugLaunchProjectAsync(projectName, noDebug: false);
+            return success
+                ? $"Debugging started for project: {projectName}"
+                : $"Failed to start debugging for project '{projectName}'. Use project_list to verify the project name.";
+        }
+        else
+        {
+            var success = await _rpcClient.DebugLaunchAsync();
+            return success ? "Debugging started" : "Failed to start debugging (is a solution open with a startup project configured?)";
+        }
     }
 
     [McpServerTool(Name = "debugger_launch_without_debugging", Destructive = false)]
-    [Description("Start the current startup project without the debugger attached (equivalent to Ctrl+F5). The application runs normally without breakpoints or stepping. A solution must be open with a valid startup project configured.")]
-    public async Task<string> DebugLaunchWithoutDebuggingAsync()
+    [Description("Start a project without the debugger attached (equivalent to Ctrl+F5). If projectName is specified, launches that specific project without changing the startup project. Otherwise runs the current startup project. The application runs normally without breakpoints or stepping. A solution must be open.")]
+    public async Task<string> DebugLaunchWithoutDebuggingAsync(
+        [Description("Optional: The display name of the project to run (e.g., 'MyProject'). Launches this project directly without changing the startup project. Use project_list to see available project names.")] string? projectName = null)
     {
-        var success = await _rpcClient.DebugLaunchWithoutDebuggingAsync();
-        return success ? "Started without debugging" : "Failed to start without debugging (is a solution open with a startup project configured?)";
+        if (projectName != null)
+        {
+            var success = await _rpcClient.DebugLaunchProjectAsync(projectName, noDebug: true);
+            return success
+                ? $"Started without debugging for project: {projectName}"
+                : $"Failed to start without debugging for project '{projectName}'. Use project_list to verify the project name.";
+        }
+        else
+        {
+            var success = await _rpcClient.DebugLaunchWithoutDebuggingAsync();
+            return success ? "Started without debugging" : "Failed to start without debugging (is a solution open with a startup project configured?)";
+        }
     }
 
     [McpServerTool(Name = "debugger_continue", Destructive = false)]
