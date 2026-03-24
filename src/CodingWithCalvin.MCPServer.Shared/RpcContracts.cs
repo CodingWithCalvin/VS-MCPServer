@@ -58,6 +58,8 @@ public interface IVisualStudioRpc
     Task<bool> DebugRemoveBreakpointAsync(string file, int line);
     Task<List<BreakpointInfo>> DebugGetBreakpointsAsync();
     Task<List<LocalVariableInfo>> DebugGetLocalsAsync();
+    Task<ExpressionResult> DebugEvaluateExpressionAsync(string expression);
+    Task<bool> DebugSetVariableValueAsync(string variableName, string value);
     Task<List<CallStackFrameInfo>> DebugGetCallStackAsync();
 
     // Diagnostics tools

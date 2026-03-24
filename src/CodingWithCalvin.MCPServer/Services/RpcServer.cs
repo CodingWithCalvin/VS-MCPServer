@@ -211,6 +211,8 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
     public Task<bool> DebugRemoveBreakpointAsync(string file, int line) => _vsService.DebugRemoveBreakpointAsync(file, line);
     public Task<List<BreakpointInfo>> DebugGetBreakpointsAsync() => _vsService.DebugGetBreakpointsAsync();
     public Task<List<LocalVariableInfo>> DebugGetLocalsAsync() => _vsService.DebugGetLocalsAsync();
+    public Task<ExpressionResult> DebugEvaluateExpressionAsync(string expression) => _vsService.DebugEvaluateExpressionAsync(expression);
+    public Task<bool> DebugSetVariableValueAsync(string variableName, string value) => _vsService.DebugSetVariableValueAsync(variableName, value);
     public Task<List<CallStackFrameInfo>> DebugGetCallStackAsync() => _vsService.DebugGetCallStackAsync();
 
     public Task<ErrorListResult> GetErrorListAsync(string? severity = null, int maxResults = 100)

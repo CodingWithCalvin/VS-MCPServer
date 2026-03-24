@@ -54,6 +54,8 @@ public interface IVisualStudioService
     Task<bool> DebugRemoveBreakpointAsync(string file, int line);
     Task<List<BreakpointInfo>> DebugGetBreakpointsAsync();
     Task<List<LocalVariableInfo>> DebugGetLocalsAsync();
+    Task<ExpressionResult> DebugEvaluateExpressionAsync(string expression);
+    Task<bool> DebugSetVariableValueAsync(string variableName, string value);
     Task<List<CallStackFrameInfo>> DebugGetCallStackAsync();
 
     Task<ErrorListResult> GetErrorListAsync(string? severity = null, int maxResults = 100);

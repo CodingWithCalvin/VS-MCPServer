@@ -30,6 +30,14 @@ public class LocalVariableInfo
     public bool IsValidValue { get; set; }
 }
 
+public class ExpressionResult
+{
+    public string Expression { get; set; } = string.Empty;
+    public string Value { get; set; } = string.Empty;
+    public string Type { get; set; } = string.Empty;
+    public bool IsValidValue { get; set; }
+}
+
 public class CallStackFrameInfo
 {
     public int Depth { get; set; }

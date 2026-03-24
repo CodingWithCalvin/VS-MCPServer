@@ -143,6 +143,27 @@ public class DebuggerTools
         return JsonSerializer.Serialize(locals, _jsonOptions);
     }
 
+    [McpServerTool(Name = "debugger_evaluate", ReadOnly = true)]
+    [Description("Evaluate an expression in the current debug context (like the Immediate Window). Only works when the debugger is in Break mode. Returns the expression, its value, type, and whether the value is valid.")]
+    public async Task<string> DebugEvaluateExpressionAsync(
+        [Description("The expression to evaluate (e.g., 'myVariable', 'list.Count', 'x + y', 'myObject.ToString()')")] string expression)
+    {
+        var result = await _rpcClient.DebugEvaluateExpressionAsync(expression);
+        return JsonSerializer.Serialize(result, _jsonOptions);
+    }
+
+    [McpServerTool(Name = "debugger_set_variable", Destructive = true)]
+    [Description("Set the value of a local variable in the current stack frame. Only works when the debugger is in Break mode. The variable must exist in the current scope.")]
+    public async Task<string> DebugSetVariableValueAsync(
+        [Description("The name of the local variable to modify (e.g., 'count', 'name'). Use debugger_get_locals to see available variables.")] string variableName,
+        [Description("The new value to assign (e.g., '42', '\"hello\"', 'true'). Must be a valid expression for the variable's type.")] string value)
+    {
+        var success = await _rpcClient.DebugSetVariableValueAsync(variableName, value);
+        return success
+            ? $"Variable '{variableName}' set to: {value}"
+            : $"Failed to set variable '{variableName}'. Ensure the debugger is in Break mode, the variable exists in the current scope, and the value is valid for its type.";
+    }
+
     [McpServerTool(Name = "debugger_get_callstack", ReadOnly = true)]
     [Description("Get the call stack of the current thread. Only works when the debugger is in Break mode. Returns depth, function name, file name, line number, module, language, and return type for each frame.")]
     public async Task<string> DebugGetCallStackAsync()

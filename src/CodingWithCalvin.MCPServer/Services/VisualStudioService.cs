@@ -1633,6 +1633,85 @@ public class VisualStudioService : IVisualStudioService
         return results;
     }
 
+    public async Task<ExpressionResult> DebugEvaluateExpressionAsync(string expression)
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+        var debugger = (Debugger2)dte.Debugger;
+
+        if (debugger.CurrentMode != dbgDebugMode.dbgBreakMode)
+        {
+            return new ExpressionResult
+            {
+                Expression = expression,
+                IsValidValue = false,
+                Value = "Debugger is not in Break mode"
+            };
+        }
+
+        try
+        {
+            var expr = debugger.GetExpression(expression, false, 1000);
+            return new ExpressionResult
+            {
+                Expression = expression,
+                Value = expr.Value ?? string.Empty,
+                Type = expr.Type ?? string.Empty,
+                IsValidValue = expr.IsValidValue
+            };
+        }
+        catch (Exception ex)
+        {
+            VsixTelemetry.TrackException(ex);
+            return new ExpressionResult
+            {
+                Expression = expression,
+                IsValidValue = false,
+                Value = ex.Message
+            };
+        }
+    }
+
+    public async Task<bool> DebugSetVariableValueAsync(string variableName, string value)
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("DebugSetVariableValue");
+
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+        var debugger = (Debugger2)dte.Debugger;
+
+        if (debugger.CurrentMode != dbgDebugMode.dbgBreakMode)
+        {
+            return false;
+        }
+
+        try
+        {
+            var frame = debugger.CurrentStackFrame;
+            if (frame == null)
+            {
+                return false;
+            }
+
+            foreach (Expression local in frame.Locals)
+            {
+                if (local.Name == variableName)
+                {
+                    local.Value = value;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            return false;
+        }
+    }
+
     public async Task<List<CallStackFrameInfo>> DebugGetCallStackAsync()
     {
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();

@@ -153,6 +153,8 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
     public Task<bool> DebugRemoveBreakpointAsync(string file, int line) => Proxy.DebugRemoveBreakpointAsync(file, line);
     public Task<List<BreakpointInfo>> DebugGetBreakpointsAsync() => Proxy.DebugGetBreakpointsAsync();
     public Task<List<Shared.Models.LocalVariableInfo>> DebugGetLocalsAsync() => Proxy.DebugGetLocalsAsync();
+    public Task<ExpressionResult> DebugEvaluateExpressionAsync(string expression) => Proxy.DebugEvaluateExpressionAsync(expression);
+    public Task<bool> DebugSetVariableValueAsync(string variableName, string value) => Proxy.DebugSetVariableValueAsync(variableName, value);
     public Task<List<CallStackFrameInfo>> DebugGetCallStackAsync() => Proxy.DebugGetCallStackAsync();
 
     public Task<ErrorListResult> GetErrorListAsync(string? severity = null, int maxResults = 100)
