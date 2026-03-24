@@ -106,7 +106,32 @@ public class VisualStudioService : IVisualStudioService
 
         foreach (EnvDTE.Project project in dte.Solution.Projects)
         {
-            try
+            CollectProjects(project, projects);
+        }
+
+        return projects;
+    }
+
+    private static void CollectProjects(EnvDTE.Project project, List<ProjectInfo> projects)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        try
+        {
+            if (project.Kind == ProjectKinds.vsProjectKindSolutionFolder)
+            {
+                if (project.ProjectItems != null)
+                {
+                    foreach (ProjectItem item in project.ProjectItems)
+                    {
+                        if (item.SubProject != null)
+                        {
+                            CollectProjects(item.SubProject, projects);
+                        }
+                    }
+                }
+            }
+            else
             {
                 projects.Add(new ProjectInfo
                 {
@@ -115,13 +140,11 @@ public class VisualStudioService : IVisualStudioService
                     Kind = project.Kind
                 });
             }
-            catch (Exception ex)
-            {
-                VsixTelemetry.TrackException(ex);
-            }
         }
-
-        return projects;
+        catch (Exception ex)
+        {
+            VsixTelemetry.TrackException(ex);
+        }
     }
 
     public async Task<List<DocumentInfo>> GetOpenDocumentsAsync()
