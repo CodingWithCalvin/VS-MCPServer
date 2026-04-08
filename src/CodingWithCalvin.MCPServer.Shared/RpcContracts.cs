@@ -67,6 +67,12 @@ public interface IVisualStudioRpc
     Task<OutputReadResult> ReadOutputPaneAsync(string paneIdentifier);
     Task<bool> WriteOutputPaneAsync(string paneIdentifier, string message, bool activate = false);
     Task<List<OutputPaneInfo>> GetOutputPanesAsync();
+
+    // Window management tools
+    Task<List<WindowInfo>> GetWindowsAsync();
+    Task<bool> ActivateWindowAsync(string caption);
+    Task<bool> ShowToolWindowAsync(string name);
+    Task<bool> HideToolWindowAsync(string caption);
 }
 
 /// <summary>

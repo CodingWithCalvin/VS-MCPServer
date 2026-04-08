@@ -2166,4 +2166,153 @@ public class VisualStudioService : IVisualStudioService
                paneGuid == VSConstants.OutputWindowPaneGuid.DebugPane_guid ||
                paneGuid == VSConstants.OutputWindowPaneGuid.GeneralPane_guid;
     }
+
+    private static readonly Dictionary<string, string> ToolWindowCommands = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["SolutionExplorer"] = "View.SolutionExplorer",
+        ["ErrorList"] = "View.ErrorList",
+        ["Output"] = "View.Output",
+        ["TeamExplorer"] = "View.TeamExplorer",
+        ["Terminal"] = "View.Terminal",
+        ["TaskList"] = "View.TaskList",
+        ["Properties"] = "View.PropertiesWindow",
+        ["Toolbox"] = "View.Toolbox",
+        ["FindResults"] = "View.FindResults1",
+        ["Bookmarks"] = "View.BookmarkWindow",
+    };
+
+    public async Task<List<Shared.Models.WindowInfo>> GetWindowsAsync()
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("GetWindows");
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+
+        try
+        {
+            var windows = new List<Shared.Models.WindowInfo>();
+
+            foreach (Window window in dte.Windows)
+            {
+                try
+                {
+                    windows.Add(new Shared.Models.WindowInfo
+                    {
+                        Caption = window.Caption,
+                        Kind = window.Document != null ? "Document" : "Tool",
+                        IsVisible = window.Visible,
+                        ObjectKind = window.ObjectKind ?? string.Empty,
+                    });
+                }
+                catch (Exception)
+                {
+                    // Some windows may not be accessible
+                }
+            }
+
+            return windows;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            return new List<Shared.Models.WindowInfo>();
+        }
+    }
+
+    public async Task<bool> ActivateWindowAsync(string caption)
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("ActivateWindow");
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+
+        try
+        {
+            foreach (Window window in dte.Windows)
+            {
+                try
+                {
+                    if (string.Equals(window.Caption, caption, StringComparison.OrdinalIgnoreCase))
+                    {
+                        window.Activate();
+                        return true;
+                    }
+                }
+                catch (Exception)
+                {
+                    // Some windows may not be accessible
+                }
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            return false;
+        }
+    }
+
+    public async Task<bool> ShowToolWindowAsync(string name)
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("ShowToolWindow");
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+
+        try
+        {
+            if (!ToolWindowCommands.TryGetValue(name, out var command))
+            {
+                return false;
+            }
+
+            dte.ExecuteCommand(command);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            return false;
+        }
+    }
+
+    public async Task<bool> HideToolWindowAsync(string caption)
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("HideToolWindow");
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+
+        try
+        {
+            foreach (Window window in dte.Windows)
+            {
+                try
+                {
+                    if (string.Equals(window.Caption, caption, StringComparison.OrdinalIgnoreCase))
+                    {
+                        window.Close();
+                        return true;
+                    }
+                }
+                catch (Exception)
+                {
+                    // Some windows may not be accessible
+                }
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            return false;
+        }
+    }
+
+    public static IReadOnlyCollection<string> GetSupportedToolWindowNames()
+    {
+        return ToolWindowCommands.Keys;
+    }
 }

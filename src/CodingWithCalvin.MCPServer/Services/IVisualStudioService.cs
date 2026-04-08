@@ -62,4 +62,9 @@ public interface IVisualStudioService
     Task<OutputReadResult> ReadOutputPaneAsync(string paneIdentifier);
     Task<bool> WriteOutputPaneAsync(string paneIdentifier, string message, bool activate = false);
     Task<List<OutputPaneInfo>> GetOutputPanesAsync();
+
+    Task<List<WindowInfo>> GetWindowsAsync();
+    Task<bool> ActivateWindowAsync(string caption);
+    Task<bool> ShowToolWindowAsync(string name);
+    Task<bool> HideToolWindowAsync(string caption);
 }

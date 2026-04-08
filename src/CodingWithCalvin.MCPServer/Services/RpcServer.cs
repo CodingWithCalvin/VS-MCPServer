@@ -221,4 +221,9 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
     public Task<bool> WriteOutputPaneAsync(string paneIdentifier, string message, bool activate = false)
         => _vsService.WriteOutputPaneAsync(paneIdentifier, message, activate);
     public Task<List<OutputPaneInfo>> GetOutputPanesAsync() => _vsService.GetOutputPanesAsync();
+
+    public Task<List<WindowInfo>> GetWindowsAsync() => _vsService.GetWindowsAsync();
+    public Task<bool> ActivateWindowAsync(string caption) => _vsService.ActivateWindowAsync(caption);
+    public Task<bool> ShowToolWindowAsync(string name) => _vsService.ShowToolWindowAsync(name);
+    public Task<bool> HideToolWindowAsync(string caption) => _vsService.HideToolWindowAsync(caption);
 }
