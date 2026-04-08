@@ -124,6 +124,15 @@
 | `output_read` | Read content from an Output window pane |
 | `output_write` | Write a message to an Output window pane |
 
+### 🪟 Window Tools
+
+| Tool | Description |
+|------|-------------|
+| `toolwindow_hide` | Hide (close) a tool window by caption |
+| `toolwindow_show` | Show a tool window by name (SolutionExplorer, ErrorList, Output, Terminal, etc.) |
+| `window_activate` | Activate (focus) a window by caption |
+| `window_list` | List all open windows with caption, kind, visibility, and GUID |
+
 ## 🛠️ Installation
 
 ### Visual Studio Marketplace
