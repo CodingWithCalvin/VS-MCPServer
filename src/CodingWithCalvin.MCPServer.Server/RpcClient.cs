@@ -65,7 +65,7 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
         }
 
         var tools = new List<ToolInfo>();
-        var toolTypes = new[] { typeof(Tools.SolutionTools), typeof(Tools.DocumentTools), typeof(Tools.BuildTools), typeof(Tools.NavigationTools), typeof(Tools.DebuggerTools), typeof(Tools.DiagnosticsTools) };
+        var toolTypes = new[] { typeof(Tools.SolutionTools), typeof(Tools.DocumentTools), typeof(Tools.BuildTools), typeof(Tools.NavigationTools), typeof(Tools.DebuggerTools), typeof(Tools.DiagnosticsTools), typeof(Tools.WindowTools) };
 
         foreach (var toolType in toolTypes)
         {
@@ -163,4 +163,9 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
     public Task<bool> WriteOutputPaneAsync(string paneIdentifier, string message, bool activate = false)
         => Proxy.WriteOutputPaneAsync(paneIdentifier, message, activate);
     public Task<List<OutputPaneInfo>> GetOutputPanesAsync() => Proxy.GetOutputPanesAsync();
+
+    public Task<List<WindowInfo>> GetWindowsAsync() => Proxy.GetWindowsAsync();
+    public Task<bool> ActivateWindowAsync(string caption) => Proxy.ActivateWindowAsync(caption);
+    public Task<bool> ShowToolWindowAsync(string name) => Proxy.ShowToolWindowAsync(name);
+    public Task<bool> HideToolWindowAsync(string caption) => Proxy.HideToolWindowAsync(caption);
 }
