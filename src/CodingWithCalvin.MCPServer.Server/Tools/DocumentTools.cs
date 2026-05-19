@@ -73,7 +73,7 @@ public class DocumentTools
     }
 
     [McpServerTool(Name = "document_cleanup", Destructive = true, Idempotent = true)]
-    [Description("Run code cleanup on an open document in Visual Studio. The document must already be open in VS. Activates the document and executes the 'Edit.RunCodeCleanupOnFile' command.")]
+    [Description("Run code cleanup on an open document in Visual Studio. The document must already be open in VS. Activates the document and executes the 'EditorContextMenus.FileHealthIndicator.RunDefaultCodeCleanup' command.")]
     public async Task<string> RunCodeCleanupAsync(
         [Description("The full absolute path to the document. Must be open in VS. Get the path from document_list. Supports forward slashes (/) or backslashes (\\).")] string path)
     {
