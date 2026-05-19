@@ -213,7 +213,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 👥 Contributors
 
 <!-- readme: contributors -start -->
-<a href="https://github.com/CalvinAllen"><img src="https://avatars.githubusercontent.com/u/41448698?v=4&s=64" width="64" height="64" align="left" alt="CalvinAllen"></a> <a href="https://github.com/Gh61"><img src="https://avatars.githubusercontent.com/u/10837736?v=4&s=64" width="64" height="64" align="left" alt="Gh61"></a> <a href="https://github.com/laviRZ"><img src="https://avatars.githubusercontent.com/u/29277997?v=4&s=64" width="64" height="64" align="left" alt="laviRZ"></a> <a href="https://github.com/shaiku"><img src="https://avatars.githubusercontent.com/u/16620522?v=4&s=64" width="64" height="64" align="left" alt="shaiku"></a> <br clear="all">
+<a href="https://github.com/CalvinAllen"><img src="https://avatars.githubusercontent.com/u/41448698?v=4&s=64" width="64" height="64" align="left" alt="CalvinAllen"></a> <a href="https://github.com/Gh61"><img src="https://avatars.githubusercontent.com/u/10837736?v=4&s=64" width="64" height="64" align="left" alt="Gh61"></a> <a href="https://github.com/gclpixel"><img src="https://avatars.githubusercontent.com/u/9727108?v=4&s=64" width="64" height="64" align="left" alt="gclpixel"></a> <a href="https://github.com/laviRZ"><img src="https://avatars.githubusercontent.com/u/29277997?v=4&s=64" width="64" height="64" align="left" alt="laviRZ"></a> <a href="https://github.com/shaiku"><img src="https://avatars.githubusercontent.com/u/16620522?v=4&s=64" width="64" height="64" align="left" alt="shaiku"></a> <br clear="all">
 <!-- readme: contributors -end -->
 
 ---
