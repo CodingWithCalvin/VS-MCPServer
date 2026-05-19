@@ -42,6 +42,7 @@
 | Tool | Description |
 |------|-------------|
 | `document_active` | Get the active document |
+| `document_cleanup` | Run code cleanup on a document |
 | `document_close` | Close a document |
 | `document_list` | List all open documents |
 | `document_open` | Open a file in the editor |

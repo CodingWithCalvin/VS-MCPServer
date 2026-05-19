@@ -20,6 +20,7 @@ public interface IVisualStudioRpc
     Task<bool> OpenDocumentAsync(string path);
     Task<bool> CloseDocumentAsync(string path, bool save);
     Task<bool> SaveDocumentAsync(string path);
+    Task<bool> RunCodeCleanupAsync(string path);
     Task<string?> ReadDocumentAsync(string path);
     Task<bool> WriteDocumentAsync(string path, string content);
     Task<SelectionInfo?> GetSelectionAsync();

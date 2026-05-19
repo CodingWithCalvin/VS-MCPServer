@@ -260,6 +260,31 @@ public class VisualStudioService : IVisualStudioService
         return false;
     }
 
+    public async Task<bool> RunCodeCleanupAsync(string path)
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+
+        foreach (Document doc in dte.Documents)
+        {
+            try
+            {
+                if (PathsEqual(doc.FullName, path))
+                {
+                    doc.Activate();
+                    dte.ExecuteCommand("EditorContextMenus.FileHealthIndicator.RunDefaultCodeCleanup");
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                VsixTelemetry.TrackException(ex);
+            }
+        }
+
+        return false;
+    }
+
     public async Task<string?> ReadDocumentAsync(string path)
     {
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
