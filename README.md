@@ -168,6 +168,11 @@ Add this to your Claude Desktop or Claude Code MCP settings (preferred HTTP meth
 }
 ```
 
+**Claude Code (CLI) - alternate installation technique:**
+```
+   claude mcp add --transport http visualstudio http://localhost:5050
+```
+
 > ℹ️ **Note:** The HTTP method is the preferred standard. SSE (Server-Sent Events) is a legacy protocol and should only be used for backward compatibility.
 
 ### ⚙️ Settings
