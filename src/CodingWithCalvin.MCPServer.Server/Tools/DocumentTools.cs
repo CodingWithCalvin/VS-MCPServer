@@ -110,7 +110,7 @@ public class DocumentTools
         var result = new System.Text.StringBuilder();
         for (int i = 0; i < selectedLines.Length; i++)
         {
-            result.AppendLine($"{startIndex + i + 1}\t{selectedLines[i].TrimEnd('\r')}");
+            result.Append($"{startIndex + i + 1}\t{selectedLines[i].TrimEnd('\r')}\n");
         }
 
         var header = $"Lines {startIndex + 1}-{startIndex + count} of {totalLines}";
