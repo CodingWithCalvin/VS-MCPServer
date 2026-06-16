@@ -18,6 +18,9 @@
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.8.0-preview.1" />
     <PackageReference Include="StreamJsonRpc" Version="2.20.20" />
+    <!-- Pin MessagePack above the transitive 2.5.187 pulled in by StreamJsonRpc to
+         remediate GHSA-hv8m-jj95-wg3x (high severity, NU1903). -->
+    <PackageReference Include="MessagePack" Version="2.5.302" />
   </ItemGroup>
 
   <ItemGroup>
