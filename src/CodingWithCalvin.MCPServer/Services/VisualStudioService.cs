@@ -11,13 +11,13 @@ using CodingWithCalvin.Otel4Vsix;
 using EnvDTE;
 using EnvDTE80;
 using Microsoft.VisualStudio;
+using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.Editor;
-using Microsoft.VisualStudio.Package;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.VisualStudio.Shell.TableManager;
 using Microsoft.VisualStudio.Shell.TableControl;
-using Microsoft.VisualStudio.Text.Editor;
+using Microsoft.VisualStudio.TextManager.Interop;
 
 namespace CodingWithCalvin.MCPServer.Services;
 
@@ -41,6 +41,73 @@ public class VisualStudioService : IVisualStudioService
     private static string NormalizePath(string path)
     {
         return Path.GetFullPath(path.Replace('/', '\\'));
+    }
+
+    private static string DetectLineEnding(string content)
+    {
+        if (content.Contains("\r\n")) return "\r\n";
+        if (content.Contains("\r")) return "\r";
+        if (content.Contains("\n")) return "\n";
+        return Environment.NewLine;
+    }
+
+    private static string NormalizeToLineEnding(string content, string lineEnding)
+    {
+        return content.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", lineEnding);
+    }
+
+    private string? TryGetVsDocumentLineEnding(string documentPath)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        try
+        {
+            var componentModel = ServiceProvider.GetService(typeof(SComponentModel)) as IComponentModel;
+            if (componentModel == null) return null;
+
+            var editorAdapters = componentModel.GetService<IVsEditorAdaptersFactoryService>();
+            if (editorAdapters == null) return null;
+
+            var rdt = ServiceProvider.GetService(typeof(SVsRunningDocumentTable)) as IVsRunningDocumentTable;
+            if (rdt == null) return null;
+
+            rdt.FindAndLockDocument(
+                (uint)_VSRDTFLAGS.RDT_NoLock,
+                NormalizePath(documentPath),
+                out _,
+                out _,
+                out IntPtr punkDocData,
+                out _);
+
+            if (punkDocData == IntPtr.Zero) return null;
+
+            try
+            {
+                var vsTextBuffer = Marshal.GetObjectForIUnknown(punkDocData) as IVsTextBuffer;
+                if (vsTextBuffer == null) return null;
+
+                var textBuffer = editorAdapters.GetDataBuffer(vsTextBuffer);
+                if (textBuffer == null) return null;
+
+                var snapshot = textBuffer.CurrentSnapshot;
+                if (snapshot.LineCount > 0)
+                {
+                    var lineBreak = snapshot.GetLineFromLineNumber(0).GetLineBreakText();
+                    if (!string.IsNullOrEmpty(lineBreak))
+                        return lineBreak;
+                }
+            }
+            finally
+            {
+                Marshal.Release(punkDocData);
+            }
+        }
+        catch
+        {
+            // ignored — fall back to content scan
+        }
+
+        return null;
     }
 
     private static bool PathsEqual(string path1, string path2)
@@ -333,8 +400,12 @@ public class VisualStudioService : IVisualStudioService
                     if (textDoc != null)
                     {
                         var editPoint = textDoc.StartPoint.CreateEditPoint();
+                        var existingContent = editPoint.GetText(textDoc.EndPoint);
+                        var lineEnding = TryGetVsDocumentLineEnding(doc.FullName) ?? DetectLineEnding(existingContent);
+                        var normalizedContent = NormalizeToLineEnding(content, lineEnding);
+                        editPoint = textDoc.StartPoint.CreateEditPoint();
                         editPoint.Delete(textDoc.EndPoint);
-                        editPoint.Insert(content);
+                        editPoint.Insert(normalizedContent);
                         return true;
                     }
                 }
@@ -423,7 +494,15 @@ public class VisualStudioService : IVisualStudioService
             return false;
         }
 
-        textDoc.Selection.Insert(text);
+        var lineEnding = TryGetVsDocumentLineEnding(doc.FullName);
+        if (lineEnding == null)
+        {
+            var samplePoint = textDoc.StartPoint.CreateEditPoint();
+            var sample = samplePoint.GetLines(1, Math.Min(textDoc.EndPoint.Line + 1, 3));
+            lineEnding = DetectLineEnding(sample);
+        }
+
+        textDoc.Selection.Insert(NormalizeToLineEnding(text, lineEnding));
         return true;
     }
 
@@ -444,11 +523,17 @@ public class VisualStudioService : IVisualStudioService
             return 0;
         }
 
+        var contentPoint = textDoc.StartPoint.CreateEditPoint();
+        var existingContent = contentPoint.GetText(textDoc.EndPoint);
+        var lineEnding = TryGetVsDocumentLineEnding(doc.FullName) ?? DetectLineEnding(existingContent);
+        var normalizedOldText = NormalizeToLineEnding(oldText, lineEnding);
+        var normalizedNewText = NormalizeToLineEnding(newText, lineEnding);
+
         var count = 0;
         var searchPoint = textDoc.StartPoint.CreateEditPoint();
         EditPoint? matchEnd = null;
 
-        while (searchPoint.FindPattern(oldText, (int)vsFindOptions.vsFindOptionsMatchCase, ref matchEnd))
+        while (searchPoint.FindPattern(normalizedOldText, (int)vsFindOptions.vsFindOptionsMatchCase, ref matchEnd))
         {
             count++;
             searchPoint = matchEnd;
@@ -457,7 +542,7 @@ public class VisualStudioService : IVisualStudioService
         if (count > 0)
         {
             TextRanges? tags = null;
-            textDoc.ReplacePattern(oldText, newText, (int)vsFindOptions.vsFindOptionsMatchCase, ref tags);
+            textDoc.ReplacePattern(normalizedOldText, normalizedNewText, (int)vsFindOptions.vsFindOptionsMatchCase, ref tags);
         }
 
         return count;
