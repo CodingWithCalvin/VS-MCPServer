@@ -621,7 +621,7 @@ public class VisualStudioService : IVisualStudioService
 
         try
         {
-            dte.Solution.SolutionBuild.Build(true);
+            dte.Solution.SolutionBuild.Build(false);
             return true;
         }
         catch (Exception ex)
@@ -643,7 +643,7 @@ public class VisualStudioService : IVisualStudioService
         {
             var config = dte.Solution.SolutionBuild.ActiveConfiguration.Name;
             var normalizedPath = NormalizePath(projectName);
-            dte.Solution.SolutionBuild.BuildProject(config, normalizedPath, true);
+            dte.Solution.SolutionBuild.BuildProject(config, normalizedPath, false);
             return true;
         }
         catch (Exception ex)
@@ -663,7 +663,7 @@ public class VisualStudioService : IVisualStudioService
 
         try
         {
-            dte.Solution.SolutionBuild.Clean(true);
+            dte.Solution.SolutionBuild.Clean(false);
             return true;
         }
         catch (Exception ex)
