@@ -168,6 +168,8 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
     public Task<List<DocumentInfo>> GetOpenDocumentsAsync() => _vsService.GetOpenDocumentsAsync();
     public Task<DocumentInfo?> GetActiveDocumentAsync() => _vsService.GetActiveDocumentAsync();
     public Task<bool> OpenDocumentAsync(string path) => _vsService.OpenDocumentAsync(path);
+    public Task<FileCreateResult> CreateFileAsync(string path, string? content = null) => _vsService.CreateFileAsync(path, content);
+    public Task<bool> CreateFolderAsync(string path) => _vsService.CreateFolderAsync(path);
     public Task<bool> CloseDocumentAsync(string path, bool save) => _vsService.CloseDocumentAsync(path, save);
     public Task<bool> SaveDocumentAsync(string path) => _vsService.SaveDocumentAsync(path);
     public Task<bool> RunCodeCleanupAsync(string path) => _vsService.RunCodeCleanupAsync(path);
@@ -228,3 +230,4 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
     public Task<bool> ShowToolWindowAsync(string name) => _vsService.ShowToolWindowAsync(name);
     public Task<bool> HideToolWindowAsync(string caption) => _vsService.HideToolWindowAsync(caption);
 }
+

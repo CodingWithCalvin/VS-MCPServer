@@ -201,4 +201,30 @@ public class DocumentTools
 
         return JsonSerializer.Serialize(results, _jsonOptions);
     }
+
+    [McpServerTool(Name = "file_create", Destructive = false, Idempotent = true)]
+    [Description("Create a new file on disk and open it in Visual Studio. If the file already exists, it will be opened without modification. Optionally provides initial content for new files.")]
+    public async Task<string> CreateFileAsync(
+        [Description("The full absolute path where to create the file (including filename). Supports forward slashes (/) or backslashes (\\).")] string path,
+        [Description("Optional initial content for the new file. If not provided, creates an empty file. Only applies if file doesn't exist.")] string? content = null)
+    {
+        var result = await _rpcClient.CreateFileAsync(path, content);
+        if (result.Success)
+        {
+            return $"Created: {path}";
+        }
+        else
+        {
+            return $"Failed to create file: {path}. Error: {result.ErrorMessage}";
+        }
+    }
+
+    [McpServerTool(Name = "folder_create", Destructive = false, Idempotent = true)]
+    [Description("Create a new folder (directory) on disk. The parent directory must already exist.")]
+    public async Task<string> CreateFolderAsync(
+        [Description("The full absolute path to the folder to create. Supports forward slashes (/) or backslashes (\\).")] string path)
+    {
+        var success = await _rpcClient.CreateFolderAsync(path);
+        return success ? $"Created folder: {path}" : $"Failed to create folder: {path}";
+    }
 }

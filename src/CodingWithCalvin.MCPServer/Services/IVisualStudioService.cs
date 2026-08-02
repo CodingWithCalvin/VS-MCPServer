@@ -14,6 +14,8 @@ public interface IVisualStudioService
     Task<List<DocumentInfo>> GetOpenDocumentsAsync();
     Task<DocumentInfo?> GetActiveDocumentAsync();
     Task<bool> OpenDocumentAsync(string path);
+    Task<FileCreateResult> CreateFileAsync(string path, string? content = null);
+    Task<bool> CreateFolderAsync(string path);
     Task<bool> CloseDocumentAsync(string path, bool save = true);
     Task<bool> SaveDocumentAsync(string path);
     Task<bool> RunCodeCleanupAsync(string path);
@@ -69,3 +71,4 @@ public interface IVisualStudioService
     Task<bool> ShowToolWindowAsync(string name);
     Task<bool> HideToolWindowAsync(string caption);
 }
+
