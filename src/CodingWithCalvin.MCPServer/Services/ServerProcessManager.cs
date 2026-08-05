@@ -15,8 +15,18 @@ namespace CodingWithCalvin.MCPServer.Services;
 [PartCreationPolicy(CreationPolicy.Shared)]
 public class ServerProcessManager : IServerProcessManager
 {
+    /// <summary>How long to wait for the server to acknowledge the RPC shutdown request.</summary>
+    private const int RpcShutdownTimeoutMs = 1000;
+
+    /// <summary>How long to wait for the server process to exit on its own afterwards.</summary>
+    private const int GracefulExitTimeoutMs = 1500;
+
+    /// <summary>How long to wait for the process to die after being killed.</summary>
+    private const int ForcedExitTimeoutMs = 500;
+
     private readonly IRpcServer _rpcServer;
     private Process? _serverProcess;
+    private ProcessJobObject? _jobObject;
     private string _pipeName = string.Empty;
     private StreamWriter? _logFileWriter;
     private string? _logFilePath;
@@ -45,7 +55,7 @@ public class ServerProcessManager : IServerProcessManager
         _pipeName = $"vsmcp-{Process.GetCurrentProcess().Id}";
 
         // Start the RPC server first
-        await _rpcServer.StartAsync(_pipeName);
+        await _rpcServer.StartAsync(_pipeName).ConfigureAwait(false);
 
         // Find the server executable
         var extensionDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
@@ -82,6 +92,10 @@ public class ServerProcessManager : IServerProcessManager
         process.EnableRaisingEvents = true;
         process.Exited += OnProcessExited;
 
+        // Tie the server's lifetime to this process. Cooperative shutdown below is the
+        // normal path; the job object is what saves us when devenv.exe dies without it.
+        AssignToJobObject(process);
+
         // Start reading output streams (server logs go to stderr by convention)
         _ = ReadOutputAsync(process.StandardOutput);
         _ = ReadOutputAsync(process.StandardError);
@@ -91,7 +105,7 @@ public class ServerProcessManager : IServerProcessManager
         Log($"Log file: {_logFilePath}");
 
         // Give the server a moment to start
-        await Task.Delay(500);
+        await Task.Delay(500).ConfigureAwait(false);
 
         // Check if process exited
         if (process.HasExited)
@@ -100,50 +114,95 @@ public class ServerProcessManager : IServerProcessManager
         }
     }
 
+    /// <remarks>
+    /// Every await in this method — and everything it calls — must use
+    /// <c>ConfigureAwait(false)</c>. Package disposal blocks a thread waiting on this, so a
+    /// continuation that needs the caller's synchronization context back would deadlock and
+    /// leave devenv.exe running forever (issue #97). The total wall time is also bounded, so
+    /// an unresponsive server cannot stall Visual Studio's shutdown.
+    /// </remarks>
     public async Task StopAsync()
     {
         // Capture reference to avoid race conditions during shutdown
         var process = _serverProcess;
+        _serverProcess = null;
 
-        if (process != null && !process.HasExited)
+        if (process != null)
         {
             try
             {
-                Log("Stopping server...");
+                if (!process.HasExited)
+                {
+                    Log("Stopping server...");
 
-                // Unsubscribe from Exited event to prevent duplicate logging
-                process.Exited -= OnProcessExited;
+                    // Unsubscribe from Exited event to prevent duplicate logging
+                    process.Exited -= OnProcessExited;
 
-                // Request graceful shutdown via RPC
-                await _rpcServer.RequestShutdownAsync();
+                    await RequestGracefulShutdownAsync(process).ConfigureAwait(false);
+                }
 
-                // Wait for process to exit gracefully (up to 5 seconds)
-                var exited = await Task.Run(() => process.WaitForExit(5000));
-
-                if (!exited)
+                if (!process.HasExited)
                 {
                     // Force kill if graceful shutdown timed out
                     Log("Graceful shutdown timed out, forcing termination...");
                     process.Kill();
-                    await Task.Run(() => process.WaitForExit(2000));
+                    await Task.Run(() => process.WaitForExit(ForcedExitTimeoutMs)).ConfigureAwait(false);
                 }
 
                 Log($"Server stopped (Code: {process.ExitCode})");
             }
-            catch
+            catch (Exception ex)
             {
-                // Process may have already exited
+                // Never allow a shutdown failure to propagate into package disposal.
+                Log($"Error stopping server: {ex.Message}");
+            }
+            finally
+            {
+                process.Dispose();
             }
         }
 
-        _serverProcess?.Dispose();
-        _serverProcess = null;
+        // Closing the job terminates the server process if it somehow outlived the above.
+        _jobObject?.Dispose();
+        _jobObject = null;
 
-        await _rpcServer.StopAsync();
+        await _rpcServer.StopAsync().ConfigureAwait(false);
 
         // Close log file
         _logFileWriter?.Dispose();
         _logFileWriter = null;
+    }
+
+    /// <summary>
+    /// Asks the server to shut down over RPC and waits briefly for it to exit. Both steps are
+    /// individually bounded because a half-open named pipe can leave an RPC call pending
+    /// indefinitely.
+    /// </summary>
+    private async Task RequestGracefulShutdownAsync(Process process)
+    {
+        // RequestShutdownAsync swallows its own errors, so the abandoned task on timeout is
+        // harmless and cannot surface as an unobserved exception.
+        var shutdownRequest = _rpcServer.RequestShutdownAsync();
+        await Task.WhenAny(shutdownRequest, Task.Delay(RpcShutdownTimeoutMs)).ConfigureAwait(false);
+
+        await Task.Run(() => process.WaitForExit(GracefulExitTimeoutMs)).ConfigureAwait(false);
+    }
+
+    private void AssignToJobObject(Process process)
+    {
+        try
+        {
+            _jobObject ??= ProcessJobObject.Create();
+
+            if (_jobObject == null || !_jobObject.TryAssign(process))
+            {
+                Log("Warning: could not assign the server to a job object; it may outlive Visual Studio if devenv.exe terminates abnormally.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"Warning: job object setup failed ({ex.Message}); the server may outlive Visual Studio if devenv.exe terminates abnormally.");
+        }
     }
 
     private void InitializeLogging(ServerStartSettings settings)
@@ -215,7 +274,7 @@ public class ServerProcessManager : IServerProcessManager
         {
             while (!reader.EndOfStream)
             {
-                var line = await reader.ReadLineAsync();
+                var line = await reader.ReadLineAsync().ConfigureAwait(false);
                 if (!string.IsNullOrEmpty(line))
                 {
                     Log($"[SERVER] {line}");

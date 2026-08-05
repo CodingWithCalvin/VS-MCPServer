@@ -102,13 +102,68 @@ public sealed class MCPServerPackage : AsyncPackage
         }
     }
 
+    /// <summary>
+    /// Total time package disposal will spend shutting the server down before giving up and
+    /// letting Visual Studio finish exiting.
+    /// </summary>
+    private static readonly TimeSpan ShutdownTimeout = TimeSpan.FromSeconds(5);
+
+    /// <remarks>
+    /// Visual Studio calls this on the UI thread. Shutdown work is therefore pushed onto the
+    /// thread pool and waited on with a timeout: <see cref="Task.Run(Func{Task})"/> starts with
+    /// no synchronization context, so no continuation can need the UI thread back, and the
+    /// timeout bounds the damage if one ever does. Blocking the UI thread directly on
+    /// <c>StopAsync</c> deadlocked and left devenv.exe resident after the main window closed
+    /// (issue #97).
+    /// </remarks>
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
-            ServerManager?.StopAsync().GetAwaiter().GetResult();
-            RpcServer?.Dispose();
+            var serverManager = ServerManager;
+
+            if (serverManager != null)
+            {
+                try
+                {
+                    var stopTask = Task.Run(() => serverManager.StopAsync());
+
+                    // VSTHRD002: Dispose cannot be async, so a blocking wait is unavoidable. It is
+                    // safe here because Task.Run starts the work without a synchronization context
+                    // and StopAsync uses ConfigureAwait(false) throughout, so no continuation can
+                    // require this thread. The timeout guarantees VS exits regardless.
+#pragma warning disable VSTHRD002
+                    if (!stopTask.Wait(ShutdownTimeout))
+#pragma warning restore VSTHRD002
+                    {
+                        // The job object assigned at start-up still guarantees the server
+                        // process dies when devenv.exe does, so exiting is safe here.
+                        System.Diagnostics.Debug.WriteLine("MCPServer: server shutdown timed out during package disposal.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // A failure to stop the server must never prevent Visual Studio from exiting.
+                    System.Diagnostics.Debug.WriteLine($"MCPServer: error stopping server during package disposal: {ex}");
+                }
+            }
+
+            try
+            {
+                RpcServer?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"MCPServer: error disposing RPC server: {ex}");
+            }
+
             VsixTelemetry.Shutdown();
+
+            ServerManager = null;
+            RpcServer = null;
+            VsService = null;
+            OutputPaneService = null;
+            Settings = null;
             Instance = null;
         }
 

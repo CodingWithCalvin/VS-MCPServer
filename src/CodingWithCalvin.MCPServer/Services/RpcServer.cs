@@ -14,6 +14,12 @@ namespace CodingWithCalvin.MCPServer.Services;
 [PartCreationPolicy(CreationPolicy.Shared)]
 public class RpcServer : IRpcServer, IVisualStudioRpc
 {
+    /// <summary>How long <see cref="StopAsync"/> waits for the pipe listener loop to unwind.</summary>
+    private const int ListenerStopTimeoutMs = 2000;
+
+    /// <summary>Upper bound on the blocking wait performed by <see cref="Dispose"/>.</summary>
+    private const int DisposeTimeoutMs = 3000;
+
     private readonly IVisualStudioService _vsService;
     private NamedPipeServerStream? _pipeServer;
     private JsonRpc? _jsonRpc;
@@ -60,11 +66,11 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
                     PipeTransmissionMode.Byte,
                     PipeOptions.Asynchronous);
 
-                await _pipeServer.WaitForConnectionAsync(cancellationToken);
+                await _pipeServer.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
 
                 _jsonRpc = JsonRpc.Attach(_pipeServer, this);
                 _serverProxy = _jsonRpc.Attach<IServerRpc>();
-                await _jsonRpc.Completion;
+                await _jsonRpc.Completion.ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -72,8 +78,22 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
             }
             catch (Exception)
             {
-                // Connection lost, restart listening
-                await Task.Delay(100, cancellationToken);
+                // Connection lost, restart listening — unless we are shutting down, in which
+                // case backing off would throw straight out of this catch block and fault the
+                // listener task.
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                try
+                {
+                    await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception)
+                {
+                    break;
+                }
             }
             finally
             {
@@ -86,6 +106,10 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
         }
     }
 
+    /// <remarks>
+    /// Called from package disposal, so every await must use <c>ConfigureAwait(false)</c> —
+    /// see the note on <see cref="ServerProcessManager.StopAsync"/>.
+    /// </remarks>
     public async Task StopAsync()
     {
         if (!IsListening)
@@ -94,38 +118,52 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
         }
 
         IsListening = false;
-        _cts?.Cancel();
+
+        var cts = _cts;
+        _cts = null;
+        cts?.Cancel();
 
         // Dispose JsonRpc to break out of the Completion await
         _jsonRpc?.Dispose();
         _pipeServer?.Dispose();
 
-        if (_listenerTask != null)
+        var listenerTask = _listenerTask;
+        _listenerTask = null;
+
+        var listenerStopped = true;
+
+        if (listenerTask != null)
         {
             try
             {
                 // Use a timeout to prevent hanging forever
-                var timeoutTask = Task.Delay(2000);
-                var completedTask = await Task.WhenAny(_listenerTask, timeoutTask);
-                if (completedTask == timeoutTask)
-                {
-                    // Listener didn't stop in time, just continue
-                }
+                var timeoutTask = Task.Delay(ListenerStopTimeoutMs);
+                var completedTask = await Task.WhenAny(listenerTask, timeoutTask).ConfigureAwait(false);
+                listenerStopped = completedTask != timeoutTask;
             }
             catch (OperationCanceledException)
             {
                 // Expected
             }
-            catch
+            catch (Exception)
             {
                 // Ignore other exceptions during shutdown
             }
         }
 
-        _cts?.Dispose();
-        _cts = null;
+        // Only dispose the token source once nothing can still be observing the token;
+        // disposing it out from under a running listener throws inside that loop.
+        if (listenerStopped)
+        {
+            cts?.Dispose();
+        }
     }
 
+    /// <remarks>
+    /// <see cref="StopAsync"/> never resumes on the caller's synchronization context, so this
+    /// blocking wait cannot deadlock the UI thread during package disposal (issue #97). The
+    /// timeout is a second line of defence.
+    /// </remarks>
     public void Dispose()
     {
         if (_disposed)
@@ -134,7 +172,20 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
         }
 
         _disposed = true;
-        StopAsync().GetAwaiter().GetResult();
+
+        try
+        {
+            // VSTHRD002: IDisposable.Dispose cannot be async. Safe for the same reasons as the
+            // wait in MCPServerPackage.Dispose — no synchronization context is captured anywhere
+            // in StopAsync — and bounded by a timeout besides.
+#pragma warning disable VSTHRD002
+            Task.Run(() => StopAsync()).Wait(DisposeTimeoutMs);
+#pragma warning restore VSTHRD002
+        }
+        catch (Exception)
+        {
+            // Disposal must not throw during Visual Studio shutdown.
+        }
     }
 
     public async Task<List<ToolInfo>> GetAvailableToolsAsync()

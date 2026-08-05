@@ -19,4 +19,5 @@ jobs:
     uses: CodingWithCalvin/.github/.github/workflows/vsix-build.yml@main
     with:
       extension-name: MCPServer
+      test-project: src/CodingWithCalvin.MCPServer.Tests/CodingWithCalvin.MCPServer.Tests.csproj
     secrets: inherit

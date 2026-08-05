@@ -2,4 +2,5 @@
   <Project Path="CodingWithCalvin.MCPServer/CodingWithCalvin.MCPServer.csproj" />
   <Project Path="CodingWithCalvin.MCPServer.Server/CodingWithCalvin.MCPServer.Server.csproj" />
   <Project Path="CodingWithCalvin.MCPServer.Shared/CodingWithCalvin.MCPServer.Shared.csproj" />
+  <Project Path="CodingWithCalvin.MCPServer.Tests/CodingWithCalvin.MCPServer.Tests.csproj" />
 </Solution>
