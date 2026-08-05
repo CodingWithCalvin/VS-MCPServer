@@ -259,6 +259,84 @@ public class VisualStudioService : IVisualStudioService
         };
     }
 
+    public async Task<FileCreateResult> CreateFileAsync(string path, string? content = null)
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("CreateFile");
+
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        
+        try
+        {
+            // Normalize the path
+            var normalizedPath = NormalizePath(path);
+            
+            // Check if file already exists
+            bool fileExists = File.Exists(normalizedPath);
+            
+            if (!fileExists)
+            {
+                // Create parent directories if they don't exist
+                var directory = Path.GetDirectoryName(normalizedPath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+                
+                // Write initial content (or empty file) - using sync version for .NET Framework 4.8 compatibility
+                File.WriteAllText(normalizedPath, content ?? string.Empty);
+            }
+            
+            // Open the file in Visual Studio
+            var dte = await GetDteAsync();
+            dte.ItemOperations.OpenFile(normalizedPath);
+            
+            return new FileCreateResult
+            {
+                Success = true,
+                Path = normalizedPath,
+                CreatedNew = !fileExists
+            };
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            
+            return new FileCreateResult
+            {
+                Success = false,
+                ErrorMessage = ex.Message
+            };
+        }
+    }
+    
+    public async Task<bool> CreateFolderAsync(string path)
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("CreateFolder");
+
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        
+        try
+        {
+            // Normalize the path
+            var normalizedPath = NormalizePath(path);
+            
+            if (Directory.Exists(normalizedPath))
+            {
+                return true;
+            }
+            
+            Directory.CreateDirectory(normalizedPath);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            return false;
+        }
+    }
+
     public async Task<bool> OpenDocumentAsync(string path)
     {
         using var activity = VsixTelemetry.Tracer.StartActivity("OpenDocument");

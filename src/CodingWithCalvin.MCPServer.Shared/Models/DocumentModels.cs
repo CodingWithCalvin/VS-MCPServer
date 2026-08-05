@@ -24,3 +24,11 @@ public class FindResult
     public string Text { get; set; } = string.Empty;
     public string DocumentPath { get; set; } = string.Empty;
 }
+
+public class FileCreateResult
+{
+    public bool Success { get; set; }
+    public string Path { get; set; } = string.Empty;
+    public bool CreatedNew { get; set; }
+    public string ErrorMessage { get; set; } = string.Empty;
+}

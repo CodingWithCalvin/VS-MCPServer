@@ -18,6 +18,8 @@ public interface IVisualStudioRpc
     Task<List<DocumentInfo>> GetOpenDocumentsAsync();
     Task<DocumentInfo?> GetActiveDocumentAsync();
     Task<bool> OpenDocumentAsync(string path);
+    Task<FileCreateResult> CreateFileAsync(string path, string? content = null);
+    Task<bool> CreateFolderAsync(string path);
     Task<bool> CloseDocumentAsync(string path, bool save);
     Task<bool> SaveDocumentAsync(string path);
     Task<bool> RunCodeCleanupAsync(string path);
@@ -85,3 +87,4 @@ public interface IServerRpc
     Task<List<ToolInfo>> GetAvailableToolsAsync();
     Task ShutdownAsync();
 }
+
