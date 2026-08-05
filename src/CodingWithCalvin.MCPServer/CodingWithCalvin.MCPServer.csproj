@@ -5,9 +5,18 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <RootNamespace>CodingWithCalvin.MCPServer</RootNamespace>
-    <!-- Suppress VS-Threading analyzer warnings that are architectural decisions or false positives in VSIX context -->
-    <NoWarn>$(NoWarn);VSTHRD002;VSTHRD003;VSTHRD010;VSTHRD110;VSSDK007</NoWarn>
+    <!--
+      Suppress VS-Threading analyzer warnings that are architectural decisions or false positives
+      in VSIX context. VSTHRD002 (synchronous waits) is deliberately NOT suppressed here: it flags
+      exactly the deadlock that left devenv.exe resident in issue #97. Suppress it at the specific
+      call site, with a justification, if a blocking wait is genuinely required.
+    -->
+    <NoWarn>$(NoWarn);VSTHRD003;VSTHRD010;VSTHRD110;VSSDK007</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CodingWithCalvin.MCPServer.Tests" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="CodingWithCalvin.Otel4Vsix" Version="0.2.2" />
