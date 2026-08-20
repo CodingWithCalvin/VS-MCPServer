@@ -130,6 +130,9 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
     public Task<bool> CleanSolutionAsync() => Proxy.CleanSolutionAsync();
     public Task<bool> CancelBuildAsync() => Proxy.CancelBuildAsync();
     public Task<BuildStatus> GetBuildStatusAsync() => Proxy.GetBuildStatusAsync();
+    public Task<BuildConfigurationInfo> GetBuildConfigurationAsync() => Proxy.GetBuildConfigurationAsync();
+    public Task<bool> SetBuildConfigurationAsync(string configuration, string platform)
+        => Proxy.SetBuildConfigurationAsync(configuration, platform);
 
     public Task<List<SymbolInfo>> GetDocumentSymbolsAsync(string path) => Proxy.GetDocumentSymbolsAsync(path);
     public Task<WorkspaceSymbolResult> SearchWorkspaceSymbolsAsync(string query, int maxResults = 100)

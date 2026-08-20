@@ -43,6 +43,14 @@ public class VisualStudioService : IVisualStudioService
         return Path.GetFullPath(path.Replace('/', '\\'));
     }
 
+    internal static bool MatchesBuildConfiguration(
+        string candidateConfiguration,
+        string candidatePlatform,
+        string configuration,
+        string platform) =>
+        string.Equals(candidateConfiguration, configuration, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(candidatePlatform, platform, StringComparison.OrdinalIgnoreCase);
+
     private static string DetectLineEnding(string content)
     {
         if (content.Contains("\r\n")) return "\r\n";
@@ -794,6 +802,82 @@ public class VisualStudioService : IVisualStudioService
             },
             FailedProjects = lastInfo
         };
+    }
+
+    public async Task<BuildConfigurationInfo> GetBuildConfigurationAsync()
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+
+        if (!dte.Solution.IsOpen)
+        {
+            return new BuildConfigurationInfo();
+        }
+
+        var solutionBuild = dte.Solution.SolutionBuild;
+        var activeConfiguration = solutionBuild.ActiveConfiguration;
+
+        var result = new BuildConfigurationInfo
+        {
+            ActiveConfiguration = activeConfiguration?.Name ?? string.Empty,
+            ActivePlatform = (activeConfiguration as SolutionConfiguration2)?.PlatformName ?? string.Empty
+        };
+
+        foreach (SolutionConfiguration solutionConfiguration in solutionBuild.SolutionConfigurations)
+        {
+            if (solutionConfiguration is SolutionConfiguration2 configuration)
+            {
+                result.AvailableConfigurations.Add(new BuildConfiguration
+                {
+                    Configuration = configuration.Name,
+                    Platform = configuration.PlatformName
+                });
+            }
+        }
+
+        return result;
+    }
+
+    public async Task<bool> SetBuildConfigurationAsync(string configuration, string platform)
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("SetBuildConfiguration");
+
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+
+        if (!dte.Solution.IsOpen
+            || string.IsNullOrWhiteSpace(configuration)
+            || string.IsNullOrWhiteSpace(platform))
+        {
+            return false;
+        }
+
+        var solutionBuild = dte.Solution.SolutionBuild;
+
+        if (solutionBuild.BuildState == vsBuildState.vsBuildStateInProgress)
+        {
+            return false;
+        }
+
+        try
+        {
+            foreach (SolutionConfiguration solutionConfiguration in solutionBuild.SolutionConfigurations)
+            {
+                if (solutionConfiguration is SolutionConfiguration2 candidate
+                    && MatchesBuildConfiguration(candidate.Name, candidate.PlatformName, configuration, platform))
+                {
+                    candidate.Activate();
+                    return true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+        }
+
+        return false;
     }
 
     public async Task<List<SymbolInfo>> GetDocumentSymbolsAsync(string path)

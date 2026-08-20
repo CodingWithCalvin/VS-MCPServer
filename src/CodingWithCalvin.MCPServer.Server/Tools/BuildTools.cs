@@ -10,6 +10,8 @@ public class BuildTools
 {
     private const string DebugSessionActiveMessage =
         "A debug session is currently active. Stop debugging first using debugger_stop before building.";
+    private const string ConfigurationDebugSessionActiveMessage =
+        "A debug session is currently active. Stop debugging first using debugger_stop before changing the build configuration.";
 
     private readonly RpcClient _rpcClient;
     private readonly JsonSerializerOptions _jsonOptions;
@@ -80,5 +82,39 @@ public class BuildTools
     {
         var status = await _rpcClient.GetBuildStatusAsync();
         return JsonSerializer.Serialize(status, _jsonOptions);
+    }
+
+    [McpServerTool(Name = "build_configuration_get", ReadOnly = true)]
+    [Description("Get the active solution build configuration and platform, plus every available configuration/platform pair. Use this before build_configuration_set to discover exact values such as 'Release' and 'x64'.")]
+    public async Task<string> GetBuildConfigurationAsync()
+    {
+        var configuration = await _rpcClient.GetBuildConfigurationAsync();
+        return JsonSerializer.Serialize(configuration, _jsonOptions);
+    }
+
+    [McpServerTool(Name = "build_configuration_set", Destructive = false, Idempotent = true)]
+    [Description("Activate an existing solution build configuration and platform in Visual Studio, such as 'Release' and 'x64'. Call build_configuration_get first because only listed pairs are accepted. Cannot change configuration while a build or debug session is active.")]
+    public async Task<string> SetBuildConfigurationAsync(
+        [Description("Solution configuration name, such as 'Debug' or 'Release'.")] string configuration,
+        [Description("Solution platform/architecture, such as 'Any CPU', 'x64', or 'ARM64'.")] string platform)
+    {
+        if (string.IsNullOrWhiteSpace(configuration) || string.IsNullOrWhiteSpace(platform))
+        {
+            return "Configuration and platform are required. Call build_configuration_get for available values.";
+        }
+
+        if (await IsDebuggingActiveAsync())
+        {
+            return ConfigurationDebugSessionActiveMessage;
+        }
+
+        var success = await _rpcClient.SetBuildConfigurationAsync(configuration.Trim(), platform.Trim());
+        if (!success)
+        {
+            return $"Failed to activate build configuration '{configuration}|{platform}'. A build may be running or the pair may not exist. Call build_configuration_get for available values.";
+        }
+
+        var activeConfiguration = await _rpcClient.GetBuildConfigurationAsync();
+        return $"Active build configuration: {activeConfiguration.ActiveConfiguration}|{activeConfiguration.ActivePlatform}";
     }
 }

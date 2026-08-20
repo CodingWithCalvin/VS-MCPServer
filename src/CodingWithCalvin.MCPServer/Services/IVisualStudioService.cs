@@ -34,6 +34,8 @@ public interface IVisualStudioService
     Task<bool> CleanSolutionAsync();
     Task<bool> CancelBuildAsync();
     Task<BuildStatus> GetBuildStatusAsync();
+    Task<BuildConfigurationInfo> GetBuildConfigurationAsync();
+    Task<bool> SetBuildConfigurationAsync(string configuration, string platform);
 
     Task<List<SymbolInfo>> GetDocumentSymbolsAsync(string path);
     Task<WorkspaceSymbolResult> SearchWorkspaceSymbolsAsync(string query, int maxResults = 100);
