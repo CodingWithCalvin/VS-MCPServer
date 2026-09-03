@@ -124,6 +124,18 @@
 | `test_stats` | Get passed, failed, skipped, and not-run counts |
 | `test_status` | Get the run state plus current counts |
 
+### 📊 Coverage Tools
+
+| Tool | Description |
+|------|-------------|
+| `coverage_analyze` | Run all tests with code coverage collection |
+| `coverage_report` | Read results as a module / class / method tree with line and block counts |
+| `coverage_show` | Open the Code Coverage Results window |
+
+> ℹ️ **Running** coverage needs an edition that supports it — Enterprise only through
+> VS 2022, all editions from VS 2026. **Reading** an existing `.coverage` file with
+> `coverage_report` works on every edition.
+
 ### 💻 Terminal Tools
 
 | Tool | Description |
