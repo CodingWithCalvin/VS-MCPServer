@@ -73,6 +73,14 @@ public interface IVisualStudioRpc
     Task<bool> WriteOutputPaneAsync(string paneIdentifier, string message, bool activate = false);
     Task<List<OutputPaneInfo>> GetOutputPanesAsync();
 
+    // Test Explorer tools
+    Task<bool> RunAllTestsAsync();
+    Task<bool> DebugAllTestsAsync();
+    Task<TestTargetResult> RunTestsInContextAsync(string target, bool debug);
+    Task<bool> CancelTestRunAsync();
+    Task<TestRunStatus> GetTestRunStatusAsync();
+    Task<TestStats> GetTestStatsAsync();
+
     // Window management tools
     Task<List<WindowInfo>> GetWindowsAsync();
     Task<bool> ActivateWindowAsync(string caption);
