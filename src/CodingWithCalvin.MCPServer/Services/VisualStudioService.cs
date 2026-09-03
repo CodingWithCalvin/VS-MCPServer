@@ -2792,6 +2792,153 @@ public class VisualStudioService : IVisualStudioService
         return TestExplorer.GetStats();
     }
 
+    private const string AnalyzeCoverageCommand = "Test.AnalyzeCodeCoverageForAllTests";
+    private const string CoverageResultsCommand = "Test.CodeCoverageResults";
+
+    private const string CoverageUnsupportedMessage =
+        "This edition of Visual Studio has no code coverage support. Code coverage was limited to "
+        + "Enterprise through VS 2022; it is available in all editions from VS 2026.";
+
+    private CoverageInterop? _coverage;
+
+    private CoverageInterop Coverage => _coverage ??= new CoverageInterop();
+
+    public async Task<CoverageRunResult> AnalyzeCodeCoverageAsync()
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("AnalyzeCodeCoverage");
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+
+        try
+        {
+            // An unknown command means the edition lacks coverage entirely; a known but disabled
+            // one means it is momentarily unavailable. Those need different advice.
+            var command = TryGetCommand(dte, AnalyzeCoverageCommand);
+            if (command == null)
+            {
+                return new CoverageRunResult { Message = CoverageUnsupportedMessage };
+            }
+
+            if (!command.IsAvailable)
+            {
+                return new CoverageRunResult
+                {
+                    Supported = true,
+                    Message = "Code coverage is not available right now. A build or test run may be "
+                        + "in progress, or the solution may have no discovered tests."
+                };
+            }
+
+            // Coverage runs the tests, so this returns as soon as the run is queued. Poll
+            // test_status for completion before reading results.
+            dte.ExecuteCommand(AnalyzeCoverageCommand);
+
+            return new CoverageRunResult { Started = true, Supported = true };
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            return new CoverageRunResult { Supported = true, Message = ex.Message };
+        }
+    }
+
+    public async Task<bool> ShowCoverageResultsAsync()
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+
+        try
+        {
+            if (!IsCommandAvailable(dte, CoverageResultsCommand))
+            {
+                return false;
+            }
+
+            dte.ExecuteCommand(CoverageResultsCommand);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            VsixTelemetry.TrackException(ex);
+            return false;
+        }
+    }
+
+    public async Task<CoverageReportResult> GetCoverageReportAsync(
+        string? coverageFile,
+        string? detail,
+        string? filter)
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("GetCoverageReport");
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+        var resolved = string.IsNullOrWhiteSpace(coverageFile)
+            ? CoverageInterop.FindNewestCoverageFile(GetTestResultsDirectory())
+            : NormalizePath(coverageFile!);
+
+        if (resolved == null)
+        {
+            return new CoverageReportResult
+            {
+                Message = "No .coverage file was found under the solution's TestResults folder. "
+                    + "Run coverage_analyze first, or pass an explicit coverageFile path."
+            };
+        }
+
+        return Coverage.ReadReport(resolved, ParseDetail(detail), filter);
+    }
+
+    private static CoverageDetail ParseDetail(string? detail) => detail?.ToLowerInvariant() switch
+    {
+        "method" => CoverageDetail.Method,
+        "summary" => CoverageDetail.Summary,
+        _ => CoverageDetail.Class
+    };
+
+    private string? GetTestResultsDirectory()
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        try
+        {
+            var dte = ServiceProvider.GetService(typeof(DTE)) as DTE2;
+            var solutionFile = dte?.Solution?.FullName;
+            if (string.IsNullOrEmpty(solutionFile))
+            {
+                return null;
+            }
+
+            var solutionDirectory = Path.GetDirectoryName(solutionFile);
+            return solutionDirectory == null
+                ? null
+                : Path.Combine(solutionDirectory, "TestResults");
+        }
+        catch (Exception ex)
+        {
+            VsixTelemetry.TrackException(ex);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Returns the command when Visual Studio knows about it, or null when it does not exist in
+    /// this installation. Commands.Item throws for unknown names.
+    /// </summary>
+    private static Command? TryGetCommand(DTE2 dte, string name)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        try
+        {
+            return dte.Commands.Item(name);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
     private TerminalInterop? _terminal;
 
     private TerminalInterop Terminal => _terminal ??= new TerminalInterop(GetServiceBroker);

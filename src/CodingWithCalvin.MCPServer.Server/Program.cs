@@ -103,7 +103,8 @@ static async Task RunServerAsync(string pipeName, string host, int port, string 
     .WithTools<DiagnosticsTools>()
     .WithTools<WindowTools>()
     .WithTools<TestTools>()
-    .WithTools<TerminalTools>();
+    .WithTools<TerminalTools>()
+    .WithTools<CoverageTools>();
 
     var app = builder.Build();
 

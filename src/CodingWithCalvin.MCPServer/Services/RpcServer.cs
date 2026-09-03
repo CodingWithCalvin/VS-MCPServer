@@ -287,6 +287,11 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
     public Task<TestRunStatus> GetTestRunStatusAsync() => _vsService.GetTestRunStatusAsync();
     public Task<TestStats> GetTestStatsAsync() => _vsService.GetTestStatsAsync();
 
+    public Task<CoverageRunResult> AnalyzeCodeCoverageAsync() => _vsService.AnalyzeCodeCoverageAsync();
+    public Task<bool> ShowCoverageResultsAsync() => _vsService.ShowCoverageResultsAsync();
+    public Task<CoverageReportResult> GetCoverageReportAsync(string? coverageFile, string? detail, string? filter)
+        => _vsService.GetCoverageReportAsync(coverageFile, detail, filter);
+
     public Task<TerminalResult> CreateTerminalAsync(string? name, string? workingDirectory, string? command)
         => _vsService.CreateTerminalAsync(name, workingDirectory, command);
     public Task<TerminalListResult> GetTerminalsAsync() => _vsService.GetTerminalsAsync();

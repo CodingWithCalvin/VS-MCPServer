@@ -65,7 +65,7 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
         }
 
         var tools = new List<ToolInfo>();
-        var toolTypes = new[] { typeof(Tools.SolutionTools), typeof(Tools.DocumentTools), typeof(Tools.BuildTools), typeof(Tools.NavigationTools), typeof(Tools.DebuggerTools), typeof(Tools.DiagnosticsTools), typeof(Tools.WindowTools), typeof(Tools.TestTools), typeof(Tools.TerminalTools) };
+        var toolTypes = new[] { typeof(Tools.SolutionTools), typeof(Tools.DocumentTools), typeof(Tools.BuildTools), typeof(Tools.NavigationTools), typeof(Tools.DebuggerTools), typeof(Tools.DiagnosticsTools), typeof(Tools.WindowTools), typeof(Tools.TestTools), typeof(Tools.TerminalTools), typeof(Tools.CoverageTools) };
 
         foreach (var toolType in toolTypes)
         {
@@ -177,6 +177,11 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
     public Task<bool> CancelTestRunAsync() => Proxy.CancelTestRunAsync();
     public Task<TestRunStatus> GetTestRunStatusAsync() => Proxy.GetTestRunStatusAsync();
     public Task<TestStats> GetTestStatsAsync() => Proxy.GetTestStatsAsync();
+
+    public Task<CoverageRunResult> AnalyzeCodeCoverageAsync() => Proxy.AnalyzeCodeCoverageAsync();
+    public Task<bool> ShowCoverageResultsAsync() => Proxy.ShowCoverageResultsAsync();
+    public Task<CoverageReportResult> GetCoverageReportAsync(string? coverageFile, string? detail, string? filter)
+        => Proxy.GetCoverageReportAsync(coverageFile, detail, filter);
 
     public Task<TerminalResult> CreateTerminalAsync(string? name, string? workingDirectory, string? command)
         => Proxy.CreateTerminalAsync(name, workingDirectory, command);

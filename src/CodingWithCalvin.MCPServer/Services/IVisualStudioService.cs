@@ -83,6 +83,11 @@ public interface IVisualStudioService
     Task<bool> CloseTerminalAsync(string terminalId);
     Task<bool> CloseAllTerminalsAsync();
 
+    // Code coverage tools
+    Task<CoverageRunResult> AnalyzeCodeCoverageAsync();
+    Task<bool> ShowCoverageResultsAsync();
+    Task<CoverageReportResult> GetCoverageReportAsync(string? coverageFile, string? detail, string? filter);
+
     Task<List<WindowInfo>> GetWindowsAsync();
     Task<bool> ActivateWindowAsync(string caption);
     Task<bool> ShowToolWindowAsync(string name);

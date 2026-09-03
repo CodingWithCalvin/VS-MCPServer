@@ -126,6 +126,7 @@ dotnet build src/CodingWithCalvin.VSMCP/CodingWithCalvin.VSMCP.csproj
 - `Services/ServerProcessManager.cs` - Server process lifecycle management
 - `Services/TestExplorerInterop.cs` - Reflection bridge to Test Explorer (see the file's remarks for why it cannot be a compile-time reference)
 - `Services/TerminalInterop.cs` - Reflection bridge to the integrated terminal, over the brokered service container
+- `Services/CoverageInterop.cs` - Reflection bridge to the code coverage file reader
 - `Server/Tools/*.cs` - MCP tool definitions
 
 ## MCP Tools Available
@@ -176,6 +177,14 @@ dotnet build src/CodingWithCalvin.VSMCP/CodingWithCalvin.VSMCP.csproj
 - `terminal_close_all` - Close every terminal
 
 Terminal output is not captured; the VS terminal is a raw PTY with no exit code.
+
+### Coverage Tools
+- `coverage_analyze` - Run all tests with coverage collection
+- `coverage_report` - Module/class/method tree with line and block counts
+- `coverage_show` - Open the Code Coverage Results window
+
+Running coverage is edition-gated (Enterprise through VS 2022, all editions from VS 2026);
+reading a .coverage file works everywhere.
 
 ## Technology Stack
 
