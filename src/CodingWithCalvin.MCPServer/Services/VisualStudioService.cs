@@ -2587,4 +2587,224 @@ public class VisualStudioService : IVisualStudioService
     {
         return ToolWindowCommands.Keys;
     }
+
+    /// <summary>
+    /// Test Explorer exposes no documented cancel command, so the first candidate that the
+    /// running Visual Studio actually recognises is used.
+    /// </summary>
+    private static readonly string[] CancelTestRunCommands =
+    {
+        "TestExplorer.CancelTestRun",
+        "TestExplorer.CancelTests"
+    };
+
+    private TestExplorerInterop? _testExplorer;
+
+    private TestExplorerInterop TestExplorer =>
+        _testExplorer ??= new TestExplorerInterop(
+            () => ServiceProvider.GetService(typeof(SComponentModel)) as IComponentModel);
+
+    public async Task<bool> RunAllTestsAsync()
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("RunAllTests");
+        return await StartTestRunAsync("TestExplorer.RunAllTests", activity);
+    }
+
+    public async Task<bool> DebugAllTestsAsync()
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("DebugAllTests");
+        return await StartTestRunAsync("TestExplorer.DebugAllTests", activity);
+    }
+
+    private async Task<bool> StartTestRunAsync(string command, Activity? activity)
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+
+        // Subscribe before issuing the command, otherwise the run's own state changes are
+        // missed and test_status reports NoRunObserved for a run that is already going.
+        TestExplorer.EnsureTracking();
+
+        try
+        {
+            if (!IsCommandAvailable(dte, command))
+            {
+                return false;
+            }
+
+            dte.ExecuteCommand(command);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            return false;
+        }
+    }
+
+    public async Task<TestTargetResult> RunTestsInContextAsync(string target, bool debug)
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity(
+            debug ? "DebugTestsInContext" : "RunTestsInContext");
+
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            return new TestTargetResult { Message = "A class or method name is required." };
+        }
+
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+
+        try
+        {
+            var search = await SearchWorkspaceSymbolsAsync(target.Trim());
+            var candidates = search.Symbols
+                .Where(s => s.Kind == SymbolKind.Class || s.Kind == SymbolKind.Function)
+                .ToList();
+
+            var symbol = SelectTestTarget(candidates, target.Trim());
+            if (symbol == null)
+            {
+                return new TestTargetResult
+                {
+                    Message = $"No class or method named '{target}' was found in the solution."
+                };
+            }
+
+            // The *InContext commands act on wherever the caret currently is, so the target has
+            // to be opened and the caret placed on it before the command is issued.
+            if (!await OpenDocumentAsync(symbol.FilePath))
+            {
+                return new TestTargetResult
+                {
+                    ResolvedTarget = symbol.FullName,
+                    FilePath = symbol.FilePath,
+                    Line = symbol.StartLine,
+                    Message = $"Could not open '{symbol.FilePath}' to position the caret."
+                };
+            }
+
+            if (!await SetSelectionAsync(
+                    symbol.FilePath,
+                    symbol.StartLine,
+                    symbol.StartColumn,
+                    symbol.StartLine,
+                    symbol.StartColumn))
+            {
+                return new TestTargetResult
+                {
+                    ResolvedTarget = symbol.FullName,
+                    FilePath = symbol.FilePath,
+                    Line = symbol.StartLine,
+                    Message = $"Could not position the caret on '{symbol.FullName}'."
+                };
+            }
+
+            var command = debug
+                ? "TestExplorer.DebugAllTestsInContext"
+                : "TestExplorer.RunAllTestsInContext";
+
+            TestExplorer.EnsureTracking();
+
+            if (!IsCommandAvailable(dte, command))
+            {
+                return new TestTargetResult
+                {
+                    ResolvedTarget = symbol.FullName,
+                    FilePath = symbol.FilePath,
+                    Line = symbol.StartLine,
+                    Message = $"'{command}' is unavailable. Test Explorer may still be discovering tests."
+                };
+            }
+
+            dte.ExecuteCommand(command);
+
+            return new TestTargetResult
+            {
+                Started = true,
+                ResolvedTarget = symbol.FullName,
+                FilePath = symbol.FilePath,
+                Line = symbol.StartLine,
+                Message = candidates.Count > 1
+                    ? $"{candidates.Count} symbols matched '{target}'; used '{symbol.FullName}'."
+                    : null
+            };
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            return new TestTargetResult { Message = ex.Message };
+        }
+    }
+
+    /// <summary>
+    /// Picks the best match for a caller-supplied class or method name, preferring an exact
+    /// fully qualified match over an exact simple name over a trailing-segment match.
+    /// </summary>
+    internal static SymbolInfo? SelectTestTarget(IReadOnlyList<SymbolInfo> candidates, string target)
+    {
+        return candidates.FirstOrDefault(s => string.Equals(s.FullName, target, StringComparison.Ordinal))
+            ?? candidates.FirstOrDefault(s => string.Equals(s.Name, target, StringComparison.Ordinal))
+            ?? candidates.FirstOrDefault(s => s.FullName.EndsWith("." + target, StringComparison.Ordinal))
+            ?? candidates.FirstOrDefault();
+    }
+
+    public async Task<bool> CancelTestRunAsync()
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+
+        foreach (var command in CancelTestRunCommands)
+        {
+            try
+            {
+                if (!IsCommandAvailable(dte, command))
+                {
+                    continue;
+                }
+
+                dte.ExecuteCommand(command);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                VsixTelemetry.TrackException(ex);
+            }
+        }
+
+        return false;
+    }
+
+    public async Task<TestRunStatus> GetTestRunStatusAsync()
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        return TestExplorer.GetRunStatus();
+    }
+
+    public async Task<TestStats> GetTestStatsAsync()
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        return TestExplorer.GetStats();
+    }
+
+    /// <summary>
+    /// ExecuteCommand throws when a command is disabled or unknown, which for Test Explorer is
+    /// the normal state before discovery finishes. Probing first keeps that an ordinary result
+    /// instead of an exception.
+    /// </summary>
+    private static bool IsCommandAvailable(DTE2 dte, string command)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        try
+        {
+            return dte.Commands.Item(command)?.IsAvailable == true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
 }

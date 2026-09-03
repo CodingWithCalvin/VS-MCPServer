@@ -65,7 +65,7 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
         }
 
         var tools = new List<ToolInfo>();
-        var toolTypes = new[] { typeof(Tools.SolutionTools), typeof(Tools.DocumentTools), typeof(Tools.BuildTools), typeof(Tools.NavigationTools), typeof(Tools.DebuggerTools), typeof(Tools.DiagnosticsTools), typeof(Tools.WindowTools) };
+        var toolTypes = new[] { typeof(Tools.SolutionTools), typeof(Tools.DocumentTools), typeof(Tools.BuildTools), typeof(Tools.NavigationTools), typeof(Tools.DebuggerTools), typeof(Tools.DiagnosticsTools), typeof(Tools.WindowTools), typeof(Tools.TestTools) };
 
         foreach (var toolType in toolTypes)
         {
@@ -169,6 +169,14 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
     public Task<bool> WriteOutputPaneAsync(string paneIdentifier, string message, bool activate = false)
         => Proxy.WriteOutputPaneAsync(paneIdentifier, message, activate);
     public Task<List<OutputPaneInfo>> GetOutputPanesAsync() => Proxy.GetOutputPanesAsync();
+
+    public Task<bool> RunAllTestsAsync() => Proxy.RunAllTestsAsync();
+    public Task<bool> DebugAllTestsAsync() => Proxy.DebugAllTestsAsync();
+    public Task<TestTargetResult> RunTestsInContextAsync(string target, bool debug)
+        => Proxy.RunTestsInContextAsync(target, debug);
+    public Task<bool> CancelTestRunAsync() => Proxy.CancelTestRunAsync();
+    public Task<TestRunStatus> GetTestRunStatusAsync() => Proxy.GetTestRunStatusAsync();
+    public Task<TestStats> GetTestStatsAsync() => Proxy.GetTestStatsAsync();
 
     public Task<List<WindowInfo>> GetWindowsAsync() => Proxy.GetWindowsAsync();
     public Task<bool> ActivateWindowAsync(string caption) => Proxy.ActivateWindowAsync(caption);

@@ -124,6 +124,7 @@ dotnet build src/CodingWithCalvin.VSMCP/CodingWithCalvin.VSMCP.csproj
 - `Services/VisualStudioService.cs` - VS API wrapper for all VS operations
 - `Services/RpcServer.cs` - Named pipe JSON-RPC server
 - `Services/ServerProcessManager.cs` - Server process lifecycle management
+- `Services/TestExplorerInterop.cs` - Reflection bridge to Test Explorer (see the file's remarks for why it cannot be a compile-time reference)
 - `Server/Tools/*.cs` - MCP tool definitions
 
 ## MCP Tools Available
@@ -155,6 +156,15 @@ dotnet build src/CodingWithCalvin.VSMCP/CodingWithCalvin.VSMCP.csproj
 - `clean_solution` - Clean solution
 - `build_cancel` - Cancel build
 - `build_status` - Get build status
+
+### Test Tools
+- `test_run_all` - Run every test in the solution
+- `test_debug_all` - Debug every test in the solution
+- `test_run` - Run tests in a specific class or method
+- `test_debug` - Debug tests in a specific class or method
+- `test_cancel` - Cancel the test run in progress
+- `test_status` - Get run state plus current counts
+- `test_stats` - Get passed/failed/skipped/not-run counts
 
 ## Technology Stack
 

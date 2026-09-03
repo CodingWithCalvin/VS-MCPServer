@@ -279,6 +279,14 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
         => _vsService.WriteOutputPaneAsync(paneIdentifier, message, activate);
     public Task<List<OutputPaneInfo>> GetOutputPanesAsync() => _vsService.GetOutputPanesAsync();
 
+    public Task<bool> RunAllTestsAsync() => _vsService.RunAllTestsAsync();
+    public Task<bool> DebugAllTestsAsync() => _vsService.DebugAllTestsAsync();
+    public Task<TestTargetResult> RunTestsInContextAsync(string target, bool debug)
+        => _vsService.RunTestsInContextAsync(target, debug);
+    public Task<bool> CancelTestRunAsync() => _vsService.CancelTestRunAsync();
+    public Task<TestRunStatus> GetTestRunStatusAsync() => _vsService.GetTestRunStatusAsync();
+    public Task<TestStats> GetTestStatsAsync() => _vsService.GetTestStatsAsync();
+
     public Task<List<WindowInfo>> GetWindowsAsync() => _vsService.GetWindowsAsync();
     public Task<bool> ActivateWindowAsync(string caption) => _vsService.ActivateWindowAsync(caption);
     public Task<bool> ShowToolWindowAsync(string name) => _vsService.ShowToolWindowAsync(name);

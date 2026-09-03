@@ -112,6 +112,18 @@
 | `output_read` | Read content from an Output window pane |
 | `output_write` | Write a message to an Output window pane |
 
+### 🧪 Test Tools
+
+| Tool | Description |
+|------|-------------|
+| `test_cancel` | Cancel the test run in progress |
+| `test_debug` | Debug the tests in a single class or method |
+| `test_debug_all` | Debug every test in the solution |
+| `test_run` | Run the tests in a single class or method |
+| `test_run_all` | Run every test in the solution |
+| `test_stats` | Get passed, failed, skipped, and not-run counts |
+| `test_status` | Get the run state plus current counts |
+
 ### 🪟 Window Tools
 
 | Tool | Description |
