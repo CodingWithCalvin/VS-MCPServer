@@ -5,16 +5,19 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using CodingWithCalvin.MCPServer.Shared.Models;
 using CodingWithCalvin.Otel4Vsix;
 using EnvDTE;
 using EnvDTE80;
+using Microsoft.ServiceHub.Framework;
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.Editor;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
+using Microsoft.VisualStudio.Shell.ServiceBroker;
 using Microsoft.VisualStudio.Shell.TableManager;
 using Microsoft.VisualStudio.Shell.TableControl;
 using Microsoft.VisualStudio.TextManager.Interop;
@@ -2787,6 +2790,126 @@ public class VisualStudioService : IVisualStudioService
     {
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
         return TestExplorer.GetStats();
+    }
+
+    private TerminalInterop? _terminal;
+
+    private TerminalInterop Terminal => _terminal ??= new TerminalInterop(GetServiceBroker);
+
+    private IServiceBroker? GetServiceBroker()
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        var container = ServiceProvider.GetService(typeof(SVsBrokeredServiceContainer))
+            as IBrokeredServiceContainer;
+
+        return container?.GetFullAccessServiceBroker();
+    }
+
+    public async Task<TerminalResult> CreateTerminalAsync(
+        string? name,
+        string? workingDirectory,
+        string? command)
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("CreateTerminal");
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+        try
+        {
+            var resolvedDirectory = ResolveTerminalWorkingDirectory(workingDirectory);
+
+            var outcome = await Terminal.CreateTerminalAsync(
+                name,
+                resolvedDirectory,
+                command,
+                CancellationToken.None);
+
+            return new TerminalResult
+            {
+                Created = outcome.Created,
+                TerminalId = outcome.Created ? outcome.TerminalId.ToString() : null,
+                Command = command,
+                WorkingDirectory = resolvedDirectory,
+                DeveloperEnvironment = outcome.DeveloperEnvironment,
+                Message = outcome.Message
+            };
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            return new TerminalResult { Message = ex.Message };
+        }
+    }
+
+    /// <summary>
+    /// Falls back to the open solution's directory so that a caller who omits the working
+    /// directory lands somewhere useful rather than in the Visual Studio install directory,
+    /// which is where devenv's own current directory usually points.
+    /// </summary>
+    private string? ResolveTerminalWorkingDirectory(string? workingDirectory)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        if (!string.IsNullOrWhiteSpace(workingDirectory))
+        {
+            return NormalizePath(workingDirectory!);
+        }
+
+        try
+        {
+            var dte = ServiceProvider.GetService(typeof(DTE)) as DTE2;
+            var solutionFile = dte?.Solution?.FullName;
+
+            return string.IsNullOrEmpty(solutionFile)
+                ? null
+                : Path.GetDirectoryName(solutionFile);
+        }
+        catch (Exception ex)
+        {
+            VsixTelemetry.TrackException(ex);
+            return null;
+        }
+    }
+
+    public async Task<TerminalListResult> GetTerminalsAsync()
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+        var ids = await Terminal.GetTerminalIdsAsync(CancellationToken.None);
+        if (ids == null)
+        {
+            return new TerminalListResult { Message = TerminalInterop.UnavailableMessage };
+        }
+
+        return new TerminalListResult
+        {
+            Available = true,
+            TerminalIds = ids.Select(id => id.ToString()).ToList()
+        };
+    }
+
+    public async Task<bool> ShowTerminalAsync(string terminalId)
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+        return Guid.TryParse(terminalId, out var id)
+            && await Terminal.ShowTerminalAsync(id, CancellationToken.None);
+    }
+
+    public async Task<bool> CloseTerminalAsync(string terminalId)
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+        return Guid.TryParse(terminalId, out var id)
+            && await Terminal.CloseTerminalAsync(id, CancellationToken.None);
+    }
+
+    public async Task<bool> CloseAllTerminalsAsync()
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+        return await Terminal.CloseAllTerminalsAsync(CancellationToken.None);
     }
 
     /// <summary>

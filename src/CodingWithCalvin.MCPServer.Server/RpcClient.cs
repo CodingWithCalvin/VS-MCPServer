@@ -65,7 +65,7 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
         }
 
         var tools = new List<ToolInfo>();
-        var toolTypes = new[] { typeof(Tools.SolutionTools), typeof(Tools.DocumentTools), typeof(Tools.BuildTools), typeof(Tools.NavigationTools), typeof(Tools.DebuggerTools), typeof(Tools.DiagnosticsTools), typeof(Tools.WindowTools), typeof(Tools.TestTools) };
+        var toolTypes = new[] { typeof(Tools.SolutionTools), typeof(Tools.DocumentTools), typeof(Tools.BuildTools), typeof(Tools.NavigationTools), typeof(Tools.DebuggerTools), typeof(Tools.DiagnosticsTools), typeof(Tools.WindowTools), typeof(Tools.TestTools), typeof(Tools.TerminalTools) };
 
         foreach (var toolType in toolTypes)
         {
@@ -177,6 +177,13 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
     public Task<bool> CancelTestRunAsync() => Proxy.CancelTestRunAsync();
     public Task<TestRunStatus> GetTestRunStatusAsync() => Proxy.GetTestRunStatusAsync();
     public Task<TestStats> GetTestStatsAsync() => Proxy.GetTestStatsAsync();
+
+    public Task<TerminalResult> CreateTerminalAsync(string? name, string? workingDirectory, string? command)
+        => Proxy.CreateTerminalAsync(name, workingDirectory, command);
+    public Task<TerminalListResult> GetTerminalsAsync() => Proxy.GetTerminalsAsync();
+    public Task<bool> ShowTerminalAsync(string terminalId) => Proxy.ShowTerminalAsync(terminalId);
+    public Task<bool> CloseTerminalAsync(string terminalId) => Proxy.CloseTerminalAsync(terminalId);
+    public Task<bool> CloseAllTerminalsAsync() => Proxy.CloseAllTerminalsAsync();
 
     public Task<List<WindowInfo>> GetWindowsAsync() => Proxy.GetWindowsAsync();
     public Task<bool> ActivateWindowAsync(string caption) => Proxy.ActivateWindowAsync(caption);

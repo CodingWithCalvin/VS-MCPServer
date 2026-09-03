@@ -124,6 +124,21 @@
 | `test_stats` | Get passed, failed, skipped, and not-run counts |
 | `test_status` | Get the run state plus current counts |
 
+### 💻 Terminal Tools
+
+| Tool | Description |
+|------|-------------|
+| `terminal_close` | Close a single integrated terminal |
+| `terminal_close_all` | Close every integrated terminal |
+| `terminal_create` | Open an empty terminal using the default profile |
+| `terminal_list` | List the open terminal identifiers |
+| `terminal_run` | Run a command in a new terminal, inside the VS developer environment |
+| `terminal_show` | Bring a terminal into view |
+
+> ⚠️ **Terminal output is not captured.** The Visual Studio terminal is a raw PTY with no
+> exit code or command boundaries, so `terminal_run` reports only whether the terminal opened.
+> To read results, redirect output to a file and read it back with `document_read`.
+
 ### 🪟 Window Tools
 
 | Tool | Description |
@@ -201,6 +216,10 @@ Configure the extension at **Tools > Options > MCP Server**:
 | Server Name | Name reported to MCP clients | `Visual Studio MCP` |
 | Log Level | Minimum log level for output | `Information` |
 | Log Retention | Days to keep log files | `7` |
+
+> ⚠️ **`terminal_run` executes commands on your machine.** Combined with a **Binding
+> Address** other than `localhost`, this exposes command execution to your network. Leave the
+> binding address at `localhost` unless you specifically need remote access.
 
 ## 🏗️ Architecture
 

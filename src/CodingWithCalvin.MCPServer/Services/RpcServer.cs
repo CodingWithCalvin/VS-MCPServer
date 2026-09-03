@@ -287,6 +287,13 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
     public Task<TestRunStatus> GetTestRunStatusAsync() => _vsService.GetTestRunStatusAsync();
     public Task<TestStats> GetTestStatsAsync() => _vsService.GetTestStatsAsync();
 
+    public Task<TerminalResult> CreateTerminalAsync(string? name, string? workingDirectory, string? command)
+        => _vsService.CreateTerminalAsync(name, workingDirectory, command);
+    public Task<TerminalListResult> GetTerminalsAsync() => _vsService.GetTerminalsAsync();
+    public Task<bool> ShowTerminalAsync(string terminalId) => _vsService.ShowTerminalAsync(terminalId);
+    public Task<bool> CloseTerminalAsync(string terminalId) => _vsService.CloseTerminalAsync(terminalId);
+    public Task<bool> CloseAllTerminalsAsync() => _vsService.CloseAllTerminalsAsync();
+
     public Task<List<WindowInfo>> GetWindowsAsync() => _vsService.GetWindowsAsync();
     public Task<bool> ActivateWindowAsync(string caption) => _vsService.ActivateWindowAsync(caption);
     public Task<bool> ShowToolWindowAsync(string name) => _vsService.ShowToolWindowAsync(name);
