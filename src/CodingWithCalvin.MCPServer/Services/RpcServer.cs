@@ -239,6 +239,9 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
     public Task<bool> CleanSolutionAsync() => _vsService.CleanSolutionAsync();
     public Task<bool> CancelBuildAsync() => _vsService.CancelBuildAsync();
     public Task<BuildStatus> GetBuildStatusAsync() => _vsService.GetBuildStatusAsync();
+    public Task<BuildConfigurationInfo> GetBuildConfigurationAsync() => _vsService.GetBuildConfigurationAsync();
+    public Task<bool> SetBuildConfigurationAsync(string configuration, string platform)
+        => _vsService.SetBuildConfigurationAsync(configuration, platform);
 
     public Task<List<SymbolInfo>> GetDocumentSymbolsAsync(string path) => _vsService.GetDocumentSymbolsAsync(path);
     public Task<WorkspaceSymbolResult> SearchWorkspaceSymbolsAsync(string query, int maxResults = 100)

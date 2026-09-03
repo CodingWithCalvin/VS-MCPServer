@@ -66,6 +66,8 @@
 | Tool | Description |
 |------|-------------|
 | `build_cancel` | Cancel a running build |
+| `build_configuration_get` | Get the active and available build configuration/platform pairs |
+| `build_configuration_set` | Change the active build configuration and platform |
 | `build_project` | Build a specific project |
 | `build_solution` | Build the entire solution |
 | `build_status` | Get current build status |
