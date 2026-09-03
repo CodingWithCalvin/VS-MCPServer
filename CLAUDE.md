@@ -132,59 +132,104 @@ dotnet build src/CodingWithCalvin.VSMCP/CodingWithCalvin.VSMCP.csproj
 ## MCP Tools Available
 
 ### Solution Tools
-- `solution_info` - Get current solution information
-- `solution_open` - Open a solution file
+- `project_info` - Get detailed project information
+- `project_list` - List all projects in the solution
 - `solution_close` - Close the current solution
-- `project_list` - List all projects
-- `project_info` - Get project details
+- `solution_info` - Get information about the current solution
+- `solution_open` - Open a solution file
+- `startup_project_get` - Get the current startup project
+- `startup_project_set` - Set the startup project for debugging
 
 ### Document Tools
-- `document_list` - List open documents
-- `document_active` - Get active document
-- `document_open` - Open a file
+- `document_active` - Get the active document
+- `document_cleanup` - Run code cleanup on a document
 - `document_close` - Close a document
-- `document_read` - Read document content
-- `document_write` - Write document content
-- `selection_get` - Get current selection
-- `selection_set` - Set selection range
-- `editor_insert` - Insert text at cursor
+- `document_list` - List all open documents
+- `document_open` - Open a file in the editor
+- `document_read` - Read document contents
+- `document_save` - Saves an open document
+- `document_write` - Write to a document
+- `file_create` - Create a file on disk and open it in the editor
+- `folder_create` - Create a folder on disk
+
+### Editor Tools
+- `editor_find` - Search within documents
+- `editor_goto_line` - Navigate to a specific line
+- `editor_insert` - Insert text at cursor position
 - `editor_replace` - Find and replace text
-- `editor_goto_line` - Navigate to line
-- `editor_find` - Search in document
+- `selection_get` - Get the current text selection
+- `selection_set` - Set the selection range
 
 ### Build Tools
-- `build_solution` - Build entire solution
-- `build_project` - Build specific project
-- `clean_solution` - Clean solution
-- `build_cancel` - Cancel build
-- `build_status` - Get build status
+- `build_cancel` - Cancel a running build
+- `build_configuration_get` - Get the active and available build configuration/platform pairs
+- `build_configuration_set` - Change the active build configuration and platform
+- `build_project` - Build a specific project
+- `build_solution` - Build the entire solution
+- `build_status` - Get current build status
+- `clean_solution` - Clean the solution
+
+### Navigation Tools
+- `find_references` - Find all references to a symbol
+- `goto_definition` - Navigate to the definition of a symbol
+- `symbol_document` - Get all symbols defined in a document
+- `symbol_workspace` - Search for symbols across the solution
+
+### Debugger Tools
+- `debugger_add_breakpoint` - Add a breakpoint at a file and line
+- `debugger_break` - Pause execution (Ctrl+Alt+Break)
+- `debugger_continue` - Continue execution (F5)
+- `debugger_evaluate` - Evaluate an expression in the current debug context
+- `debugger_get_callstack` - Get the call stack
+- `debugger_get_locals` - Get local variables in current frame
+- `debugger_launch` - Start debugging (F5), optionally for a specific project
+- `debugger_launch_without_debugging` - Start without debugger (Ctrl+F5), optionally for a specific project
+- `debugger_list_breakpoints` - List all breakpoints
+- `debugger_remove_breakpoint` - Remove a breakpoint
+- `debugger_set_variable` - Set the value of a local variable
+- `debugger_status` - Get current debugger state
+- `debugger_step_into` - Step into (F11)
+- `debugger_step_out` - Step out (Shift+F11)
+- `debugger_step_over` - Step over (F10)
+- `debugger_stop` - Stop debugging (Shift+F5)
+
+### Diagnostics Tools
+- `errors_list` - Read build errors, warnings, and messages from the Error List
+- `output_list_panes` - List all available Output window panes
+- `output_read` - Read content from an Output window pane
+- `output_write` - Write a message to an Output window pane
 
 ### Test Tools
-- `test_run_all` - Run every test in the solution
-- `test_debug_all` - Debug every test in the solution
-- `test_run` - Run tests in a specific class or method
-- `test_debug` - Debug tests in a specific class or method
 - `test_cancel` - Cancel the test run in progress
-- `test_status` - Get run state plus current counts
-- `test_stats` - Get passed/failed/skipped/not-run counts
-
-### Terminal Tools
-- `terminal_run` - Run a command in a new VS terminal (developer environment)
-- `terminal_create` - Open an empty terminal using the default profile
-- `terminal_list` - List open terminal identifiers
-- `terminal_show` - Bring a terminal into view
-- `terminal_close` - Close a single terminal
-- `terminal_close_all` - Close every terminal
-
-Terminal output is not captured; the VS terminal is a raw PTY with no exit code.
+- `test_debug` - Debug the tests in a single class or method
+- `test_debug_all` - Debug every test in the solution
+- `test_run` - Run the tests in a single class or method
+- `test_run_all` - Run every test in the solution
+- `test_stats` - Get passed, failed, skipped, and not-run counts
+- `test_status` - Get the run state plus current counts
 
 ### Coverage Tools
-- `coverage_analyze` - Run all tests with coverage collection
-- `coverage_report` - Module/class/method tree with line and block counts
+- `coverage_analyze` - Run all tests with code coverage collection
+- `coverage_report` - Read results as a module / class / method tree with line and block counts
 - `coverage_show` - Open the Code Coverage Results window
 
-Running coverage is edition-gated (Enterprise through VS 2022, all editions from VS 2026);
-reading a .coverage file works everywhere.
+Running coverage needs an edition that supports it — Enterprise only through VS 2022, all editions from VS 2026. Reading an existing `.coverage` file with `coverage_report` works on every edition.
+
+### Terminal Tools
+- `terminal_close` - Close a single integrated terminal
+- `terminal_close_all` - Close every integrated terminal
+- `terminal_create` - Open an empty terminal using the default profile
+- `terminal_list` - List the open terminal identifiers
+- `terminal_run` - Run a command in a new terminal, inside the VS developer environment
+- `terminal_show` - Bring a terminal into view
+
+Terminal output is not captured. The Visual Studio terminal is a raw PTY with no exit code or command boundaries, so `terminal_run` reports only whether the terminal opened. To read results, redirect output to a file and read it back with `document_read`.
+
+### Window Tools
+- `toolwindow_hide` - Hide (close) a tool window by caption
+- `toolwindow_show` - Show a tool window by name (SolutionExplorer, ErrorList, Output, Terminal, etc.)
+- `window_activate` - Activate (focus) a window by caption
+- `window_list` - List all open windows with caption, kind, visibility, and GUID
 
 ## Technology Stack
 

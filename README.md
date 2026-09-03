@@ -49,6 +49,8 @@
 | `document_read` | Read document contents |
 | `document_save` | Saves an open document |
 | `document_write` | Write to a document |
+| `file_create` | Create a file on disk and open it in the editor |
+| `folder_create` | Create a folder on disk |
 
 ### ✏️ Editor Tools
 
