@@ -81,6 +81,13 @@ public interface IVisualStudioRpc
     Task<TestRunStatus> GetTestRunStatusAsync();
     Task<TestStats> GetTestStatsAsync();
 
+    // Terminal tools
+    Task<TerminalResult> CreateTerminalAsync(string? name, string? workingDirectory, string? command);
+    Task<TerminalListResult> GetTerminalsAsync();
+    Task<bool> ShowTerminalAsync(string terminalId);
+    Task<bool> CloseTerminalAsync(string terminalId);
+    Task<bool> CloseAllTerminalsAsync();
+
     // Window management tools
     Task<List<WindowInfo>> GetWindowsAsync();
     Task<bool> ActivateWindowAsync(string caption);

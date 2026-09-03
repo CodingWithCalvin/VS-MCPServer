@@ -125,6 +125,7 @@ dotnet build src/CodingWithCalvin.VSMCP/CodingWithCalvin.VSMCP.csproj
 - `Services/RpcServer.cs` - Named pipe JSON-RPC server
 - `Services/ServerProcessManager.cs` - Server process lifecycle management
 - `Services/TestExplorerInterop.cs` - Reflection bridge to Test Explorer (see the file's remarks for why it cannot be a compile-time reference)
+- `Services/TerminalInterop.cs` - Reflection bridge to the integrated terminal, over the brokered service container
 - `Server/Tools/*.cs` - MCP tool definitions
 
 ## MCP Tools Available
@@ -165,6 +166,16 @@ dotnet build src/CodingWithCalvin.VSMCP/CodingWithCalvin.VSMCP.csproj
 - `test_cancel` - Cancel the test run in progress
 - `test_status` - Get run state plus current counts
 - `test_stats` - Get passed/failed/skipped/not-run counts
+
+### Terminal Tools
+- `terminal_run` - Run a command in a new VS terminal (developer environment)
+- `terminal_create` - Open an empty terminal using the default profile
+- `terminal_list` - List open terminal identifiers
+- `terminal_show` - Bring a terminal into view
+- `terminal_close` - Close a single terminal
+- `terminal_close_all` - Close every terminal
+
+Terminal output is not captured; the VS terminal is a raw PTY with no exit code.
 
 ## Technology Stack
 
