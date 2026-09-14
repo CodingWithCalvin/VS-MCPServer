@@ -55,7 +55,14 @@ public interface IVisualStudioService
     Task<bool> DebugStepIntoAsync();
     Task<bool> DebugStepOutAsync();
 
-    Task<bool> DebugAddBreakpointAsync(string file, int line);
+    Task<bool> DebugAddBreakpointAsync(
+        string file,
+        int line,
+        string? condition = null,
+        BreakpointConditionType conditionType = BreakpointConditionType.WhenTrue,
+        int? hitCount = null,
+        BreakpointHitCountType hitCountType = BreakpointHitCountType.None);
+    Task<bool> DebugSetBreakpointEnabledAsync(string file, int line, bool enabled);
     Task<bool> DebugRemoveBreakpointAsync(string file, int line);
     Task<List<BreakpointInfo>> DebugGetBreakpointsAsync();
     Task<List<LocalVariableInfo>> DebugGetLocalsAsync();

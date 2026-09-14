@@ -11,6 +11,20 @@ public class DebuggerStatus
     public string CurrentFunction { get; set; } = string.Empty;
 }
 
+public enum BreakpointConditionType
+{
+    WhenTrue,
+    WhenChanged
+}
+
+public enum BreakpointHitCountType
+{
+    None,
+    Equal,
+    GreaterOrEqual,
+    Multiple
+}
+
 public class BreakpointInfo
 {
     public string File { get; set; } = string.Empty;
@@ -18,8 +32,11 @@ public class BreakpointInfo
     public int Column { get; set; }
     public string FunctionName { get; set; } = string.Empty;
     public string Condition { get; set; } = string.Empty;
+    public string ConditionType { get; set; } = string.Empty;
     public bool Enabled { get; set; }
     public int CurrentHits { get; set; }
+    public int HitCountTarget { get; set; }
+    public string HitCountType { get; set; } = string.Empty;
 }
 
 public class LocalVariableInfo
