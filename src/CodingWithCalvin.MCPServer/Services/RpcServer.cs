@@ -264,7 +264,16 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
     public Task<bool> DebugStepIntoAsync() => _vsService.DebugStepIntoAsync();
     public Task<bool> DebugStepOutAsync() => _vsService.DebugStepOutAsync();
 
-    public Task<bool> DebugAddBreakpointAsync(string file, int line) => _vsService.DebugAddBreakpointAsync(file, line);
+    public Task<bool> DebugAddBreakpointAsync(
+        string file,
+        int line,
+        string? condition = null,
+        BreakpointConditionType conditionType = BreakpointConditionType.WhenTrue,
+        int? hitCount = null,
+        BreakpointHitCountType hitCountType = BreakpointHitCountType.None)
+        => _vsService.DebugAddBreakpointAsync(file, line, condition, conditionType, hitCount, hitCountType);
+    public Task<bool> DebugSetBreakpointEnabledAsync(string file, int line, bool enabled)
+        => _vsService.DebugSetBreakpointEnabledAsync(file, line, enabled);
     public Task<bool> DebugRemoveBreakpointAsync(string file, int line) => _vsService.DebugRemoveBreakpointAsync(file, line);
     public Task<List<BreakpointInfo>> DebugGetBreakpointsAsync() => _vsService.DebugGetBreakpointsAsync();
     public Task<List<LocalVariableInfo>> DebugGetLocalsAsync() => _vsService.DebugGetLocalsAsync();

@@ -46,6 +46,51 @@ public class VisualStudioService : IVisualStudioService
         return Path.GetFullPath(path.Replace('/', '\\'));
     }
 
+    internal static dbgBreakpointConditionType ToDteConditionType(BreakpointConditionType conditionType) =>
+        conditionType switch
+        {
+            BreakpointConditionType.WhenTrue => dbgBreakpointConditionType.dbgBreakpointConditionTypeWhenTrue,
+            BreakpointConditionType.WhenChanged => dbgBreakpointConditionType.dbgBreakpointConditionTypeWhenChanged,
+            _ => throw new ArgumentOutOfRangeException(nameof(conditionType))
+        };
+
+    internal static dbgHitCountType ToDteHitCountType(BreakpointHitCountType hitCountType) =>
+        hitCountType switch
+        {
+            BreakpointHitCountType.None => dbgHitCountType.dbgHitCountTypeNone,
+            BreakpointHitCountType.Equal => dbgHitCountType.dbgHitCountTypeEqual,
+            BreakpointHitCountType.GreaterOrEqual => dbgHitCountType.dbgHitCountTypeGreaterOrEqual,
+            BreakpointHitCountType.Multiple => dbgHitCountType.dbgHitCountTypeMultiple,
+            _ => throw new ArgumentOutOfRangeException(nameof(hitCountType))
+        };
+
+    internal static string GetConditionTypeName(dbgBreakpointConditionType conditionType) =>
+        conditionType switch
+        {
+            dbgBreakpointConditionType.dbgBreakpointConditionTypeWhenTrue => "whenTrue",
+            dbgBreakpointConditionType.dbgBreakpointConditionTypeWhenChanged => "whenChanged",
+            _ => conditionType.ToString()
+        };
+
+    internal static string GetHitCountTypeName(dbgHitCountType hitCountType) =>
+        hitCountType switch
+        {
+            dbgHitCountType.dbgHitCountTypeNone => "none",
+            dbgHitCountType.dbgHitCountTypeEqual => "equal",
+            dbgHitCountType.dbgHitCountTypeGreaterOrEqual => "greaterOrEqual",
+            dbgHitCountType.dbgHitCountTypeMultiple => "multiple",
+            _ => hitCountType.ToString()
+        };
+
+    internal static bool IsValidBreakpointConfiguration(
+        int line,
+        int? hitCount,
+        BreakpointHitCountType hitCountType) =>
+        line > 0
+        && (hitCountType == BreakpointHitCountType.None
+            ? !hitCount.HasValue
+            : hitCount.HasValue && hitCount.Value > 0);
+
     internal static bool MatchesBuildConfiguration(
         string candidateConfiguration,
         string candidatePlatform,
@@ -1771,9 +1816,21 @@ public class VisualStudioService : IVisualStudioService
         }
     }
 
-    public async Task<bool> DebugAddBreakpointAsync(string file, int line)
+    public async Task<bool> DebugAddBreakpointAsync(
+        string file,
+        int line,
+        string? condition = null,
+        BreakpointConditionType conditionType = BreakpointConditionType.WhenTrue,
+        int? hitCount = null,
+        BreakpointHitCountType hitCountType = BreakpointHitCountType.None)
     {
         using var activity = VsixTelemetry.Tracer.StartActivity("DebugAddBreakpoint");
+
+        if (!IsValidBreakpointConfiguration(line, hitCount, hitCountType))
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "Invalid breakpoint configuration");
+            return false;
+        }
 
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
         var dte = await GetDteAsync();
@@ -1782,8 +1839,50 @@ public class VisualStudioService : IVisualStudioService
         try
         {
             var normalizedPath = NormalizePath(file);
-            debugger.Breakpoints.Add(Function: "", File: normalizedPath, Line: line);
+            debugger.Breakpoints.Add(
+                Function: "",
+                File: normalizedPath,
+                Line: line,
+                Condition: condition ?? string.Empty,
+                ConditionType: ToDteConditionType(conditionType),
+                HitCount: hitCount.GetValueOrDefault(),
+                HitCountType: ToDteHitCountType(hitCountType));
             return true;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            return false;
+        }
+    }
+
+    public async Task<bool> DebugSetBreakpointEnabledAsync(string file, int line, bool enabled)
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("DebugSetBreakpointEnabled");
+
+        if (line < 1)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "Invalid breakpoint line");
+            return false;
+        }
+
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        var dte = await GetDteAsync();
+        var debugger = (Debugger2)dte.Debugger;
+
+        try
+        {
+            foreach (Breakpoint breakpoint in debugger.Breakpoints)
+            {
+                if (breakpoint.File != null && PathsEqual(breakpoint.File, file) && breakpoint.FileLine == line)
+                {
+                    breakpoint.Enabled = enabled;
+                    return true;
+                }
+            }
+
+            return false;
         }
         catch (Exception ex)
         {
@@ -1844,8 +1943,11 @@ public class VisualStudioService : IVisualStudioService
                         Column = bp.FileColumn,
                         FunctionName = bp.FunctionName ?? string.Empty,
                         Condition = bp.Condition ?? string.Empty,
+                        ConditionType = GetConditionTypeName(bp.ConditionType),
                         Enabled = bp.Enabled,
-                        CurrentHits = bp.CurrentHits
+                        CurrentHits = bp.CurrentHits,
+                        HitCountTarget = bp.HitCountTarget,
+                        HitCountType = GetHitCountTypeName(bp.HitCountType)
                     });
                 }
                 catch (Exception ex)

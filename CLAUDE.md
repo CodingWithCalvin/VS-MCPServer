@@ -176,7 +176,8 @@ dotnet build src/CodingWithCalvin.VSMCP/CodingWithCalvin.VSMCP.csproj
 - `symbol_workspace` - Search for symbols across the solution
 
 ### Debugger Tools
-- `debugger_add_breakpoint` - Add a breakpoint at a file and line
+- `breakpoint_enable` - Enable or disable a breakpoint at a file and line
+- `debugger_add_breakpoint` - Add a breakpoint, optionally with a condition and hit-count rule
 - `debugger_break` - Pause execution (Ctrl+Alt+Break)
 - `debugger_continue` - Continue execution (F5)
 - `debugger_evaluate` - Evaluate an expression in the current debug context
@@ -184,7 +185,7 @@ dotnet build src/CodingWithCalvin.VSMCP/CodingWithCalvin.VSMCP.csproj
 - `debugger_get_locals` - Get local variables in current frame
 - `debugger_launch` - Start debugging (F5), optionally for a specific project
 - `debugger_launch_without_debugging` - Start without debugger (Ctrl+F5), optionally for a specific project
-- `debugger_list_breakpoints` - List all breakpoints
+- `debugger_list_breakpoints` - List all breakpoints, including conditions and hit-count rules
 - `debugger_remove_breakpoint` - Remove a breakpoint
 - `debugger_set_variable` - Set the value of a local variable
 - `debugger_status` - Get current debugger state
