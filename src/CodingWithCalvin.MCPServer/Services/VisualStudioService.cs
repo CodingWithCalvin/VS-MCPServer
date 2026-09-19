@@ -193,20 +193,39 @@ public class VisualStudioService : IVisualStudioService
     {
         using var activity = VsixTelemetry.Tracer.StartActivity("OpenSolution");
 
+        var normalizedPath = NormalizePath(path);
+
+        if (!File.Exists(normalizedPath))
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "Solution file not found");
+            return false;
+        }
+
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
         var dte = await GetDteAsync();
 
-        try
+        // EnvDTE's Solution.Open() is synchronous and can take a long time for large
+        // solutions. Awaiting it here would block this RPC call (and the calling MCP client)
+        // until the whole solution finishes loading, which can exceed client timeouts and
+        // surface as "An error occurred invoking 'solution_open'" even though the solution is
+        // loading normally. Fire the load off without waiting for it to finish; callers can
+        // poll solution_info to observe when the new solution becomes available.
+        _ = Task.Run(async () =>
         {
-            dte.Solution.Open(path);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-            activity?.RecordException(ex);
-            return false;
-        }
+            using var loadActivity = VsixTelemetry.Tracer.StartActivity("OpenSolution.Load");
+            try
+            {
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                dte.Solution.Open(normalizedPath);
+            }
+            catch (Exception ex)
+            {
+                loadActivity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                loadActivity?.RecordException(ex);
+            }
+        });
+
+        return true;
     }
 
     public async Task CloseSolutionAsync(bool saveFirst = true)

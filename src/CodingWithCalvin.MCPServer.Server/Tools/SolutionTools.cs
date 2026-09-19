@@ -31,12 +31,12 @@ public class SolutionTools
     }
 
     [McpServerTool(Name = "solution_open", Destructive = true, Idempotent = true)]
-    [Description("Open a solution file in Visual Studio. This will close any currently open solution.")]
+    [Description("Open a solution file in Visual Studio. This will close any currently open solution. Loading runs asynchronously and this returns as soon as the load has started; use solution_info to check when the solution has finished loading.")]
     public async Task<string> OpenSolutionAsync(
         [Description("The full absolute path to the solution file (.sln or .slnx). Supports forward slashes (/) or backslashes (\\).")] string path)
     {
         var success = await _rpcClient.OpenSolutionAsync(path);
-        return success ? $"Opened solution: {path}" : $"Failed to open solution: {path}";
+        return success ? $"Opening solution: {path}" : $"Failed to open solution (file not found?): {path}";
     }
 
     [McpServerTool(Name = "solution_close", Destructive = true, Idempotent = true)]
