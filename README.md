@@ -163,6 +163,18 @@
 | `window_activate` | Activate (focus) a window by caption |
 | `window_list` | List all open windows with caption, kind, visibility, and GUID |
 
+### 💬 Dialog Tools
+
+| Tool | Description |
+|------|-------------|
+| `dialog_list` | List the modal dialogs Visual Studio is waiting on, with their message and buttons |
+| `dialog_respond` | Answer a dialog by clicking one of its buttons |
+
+> 💡 **Stuck on a dialog?** A modal dialog, like "The source code is different from the original
+> version" or "Hot Reload changes not supported", blocks Visual Studio until someone answers it.
+> If a tool call hangs or times out, `dialog_list` shows what Visual Studio is waiting on and
+> `dialog_respond` answers it. Both work while the blocked call is still waiting.
+
 ## 🛠️ Installation
 
 ### Visual Studio Marketplace

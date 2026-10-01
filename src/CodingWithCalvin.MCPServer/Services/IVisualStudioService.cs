@@ -99,5 +99,9 @@ public interface IVisualStudioService
     Task<bool> ActivateWindowAsync(string caption);
     Task<bool> ShowToolWindowAsync(string name);
     Task<bool> HideToolWindowAsync(string caption);
+
+    // Dialog tools
+    Task<DialogListResult> GetDialogsAsync();
+    Task<DialogResponseResult> RespondToDialogAsync(string button, string? dialogId);
 }
 
