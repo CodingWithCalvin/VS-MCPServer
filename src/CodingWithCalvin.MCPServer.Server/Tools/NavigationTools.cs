@@ -32,11 +32,16 @@ public class NavigationTools
     }
 
     [McpServerTool(Name = "symbol_workspace", ReadOnly = true)]
-    [Description("Search for symbols (classes, methods, properties, etc.) across the entire solution. Returns symbols matching the query with their locations. Useful for finding types or members by name.")]
+    [Description("Search for symbols (classes, methods, properties, etc.) across the entire solution. Returns symbols matching the query with their locations. Useful for finding types or members by name. The search stops as soon as it has found more than maxResults matches, so there is no total count; Truncated is true when more symbols matched than were returned. Narrow the query or raise maxResults to see the rest.")]
     public async Task<string> SearchWorkspaceSymbolsAsync(
         [Description("The search query to match against symbol names. Case-insensitive. Partial matches are supported.")] string query,
-        [Description("Maximum number of results to return. Defaults to 100. Use lower values for faster results on large solutions.")] int maxResults = 100)
+        [Description("Maximum number of results to return. Defaults to 100 and must be at least 1. The search stops once it has enough, so lower values are faster on large solutions.")] int maxResults = 100)
     {
+        if (maxResults < 1)
+        {
+            return $"Invalid maxResults '{maxResults}'. It must be at least 1.";
+        }
+
         var result = await _rpcClient.SearchWorkspaceSymbolsAsync(query, maxResults);
         if (result.Symbols.Count == 0)
         {
