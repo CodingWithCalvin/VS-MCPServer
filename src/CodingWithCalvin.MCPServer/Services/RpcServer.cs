@@ -311,5 +311,9 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
     public Task<bool> ActivateWindowAsync(string caption) => _vsService.ActivateWindowAsync(caption);
     public Task<bool> ShowToolWindowAsync(string name) => _vsService.ShowToolWindowAsync(name);
     public Task<bool> HideToolWindowAsync(string caption) => _vsService.HideToolWindowAsync(caption);
+
+    public Task<DialogListResult> GetDialogsAsync() => _vsService.GetDialogsAsync();
+    public Task<DialogResponseResult> RespondToDialogAsync(string button, string? dialogId)
+        => _vsService.RespondToDialogAsync(button, dialogId);
 }
 

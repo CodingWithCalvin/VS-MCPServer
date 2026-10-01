@@ -127,6 +127,7 @@ dotnet build src/CodingWithCalvin.VSMCP/CodingWithCalvin.VSMCP.csproj
 - `Services/TestExplorerInterop.cs` - Reflection bridge to Test Explorer (see the file's remarks for why it cannot be a compile-time reference)
 - `Services/TerminalInterop.cs` - Reflection bridge to the integrated terminal, over the brokered service container
 - `Services/CoverageInterop.cs` - Reflection bridge to the code coverage file reader
+- `Services/DialogAutomation.cs` - Finds and answers modal dialogs via Win32 and UI Automation, without ever touching the UI thread the dialog is blocking
 - `Server/Tools/*.cs` - MCP tool definitions
 
 ## MCP Tools Available
@@ -233,6 +234,12 @@ Terminal output is not captured. The Visual Studio terminal is a raw PTY with no
 - `toolwindow_show` - Show a tool window by name (SolutionExplorer, ErrorList, Output, Terminal, etc.)
 - `window_activate` - Activate (focus) a window by caption
 - `window_list` - List all open windows with caption, kind, visibility, and GUID
+
+### Dialog Tools
+- `dialog_list` - List the modal dialogs Visual Studio is waiting on, with their message and buttons
+- `dialog_respond` - Answer a dialog by clicking one of its buttons
+
+A modal dialog holds the VS UI thread, so every other tool call that needs it waits until the dialog is answered. The dialog tools must never switch to the UI thread: they run on the thread pool and stay responsive while the blocked call is still waiting.
 
 ## Technology Stack
 

@@ -65,7 +65,7 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
         }
 
         var tools = new List<ToolInfo>();
-        var toolTypes = new[] { typeof(Tools.SolutionTools), typeof(Tools.DocumentTools), typeof(Tools.BuildTools), typeof(Tools.NavigationTools), typeof(Tools.DebuggerTools), typeof(Tools.DiagnosticsTools), typeof(Tools.WindowTools), typeof(Tools.TestTools), typeof(Tools.TerminalTools), typeof(Tools.CoverageTools) };
+        var toolTypes = new[] { typeof(Tools.SolutionTools), typeof(Tools.DocumentTools), typeof(Tools.BuildTools), typeof(Tools.NavigationTools), typeof(Tools.DebuggerTools), typeof(Tools.DiagnosticsTools), typeof(Tools.WindowTools), typeof(Tools.TestTools), typeof(Tools.TerminalTools), typeof(Tools.CoverageTools), typeof(Tools.DialogTools) };
 
         foreach (var toolType in toolTypes)
         {
@@ -202,4 +202,8 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
     public Task<bool> ActivateWindowAsync(string caption) => Proxy.ActivateWindowAsync(caption);
     public Task<bool> ShowToolWindowAsync(string name) => Proxy.ShowToolWindowAsync(name);
     public Task<bool> HideToolWindowAsync(string caption) => Proxy.HideToolWindowAsync(caption);
+
+    public Task<DialogListResult> GetDialogsAsync() => Proxy.GetDialogsAsync();
+    public Task<DialogResponseResult> RespondToDialogAsync(string button, string? dialogId)
+        => Proxy.RespondToDialogAsync(button, dialogId);
 }

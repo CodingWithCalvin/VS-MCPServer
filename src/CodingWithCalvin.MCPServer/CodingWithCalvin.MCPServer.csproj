@@ -26,6 +26,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- UI Automation client, used by DialogAutomation to read and answer modal dialogs. -->
+    <Reference Include="UIAutomationClient" />
+    <Reference Include="UIAutomationTypes" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\CodingWithCalvin.MCPServer.Shared\CodingWithCalvin.MCPServer.Shared.csproj" />
   </ItemGroup>
 

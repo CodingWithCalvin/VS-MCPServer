@@ -26,4 +26,14 @@
     <ProjectReference Include="..\CodingWithCalvin.MCPServer\CodingWithCalvin.MCPServer.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Real Win32 and WPF dialogs for DialogAutomationTests to find and answer. -->
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="WindowsBase" />
+  </ItemGroup>
+
 </Project>

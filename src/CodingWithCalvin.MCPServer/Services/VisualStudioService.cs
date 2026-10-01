@@ -3396,6 +3396,49 @@ public class VisualStudioService : IVisualStudioService
         return await Terminal.CloseAllTerminalsAsync(CancellationToken.None);
     }
 
+    private DialogAutomation? _dialogs;
+
+    private DialogAutomation Dialogs => _dialogs ??= new DialogAutomation();
+
+    /// <remarks>
+    /// Never switches to the UI thread. A modal dialog is what holds that thread, so this has to
+    /// answer while the call that raised the dialog is still waiting on it.
+    /// </remarks>
+    public async Task<DialogListResult> GetDialogsAsync()
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("GetDialogs");
+
+        try
+        {
+            return await Dialogs.GetDialogsAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            return new DialogListResult { Message = $"Could not enumerate dialogs: {ex.Message}" };
+        }
+    }
+
+    /// <remarks>
+    /// Never switches to the UI thread, for the same reason as <see cref="GetDialogsAsync"/>.
+    /// </remarks>
+    public async Task<DialogResponseResult> RespondToDialogAsync(string button, string? dialogId)
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("RespondToDialog");
+
+        try
+        {
+            return await Dialogs.RespondAsync(button, dialogId).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            return new DialogResponseResult { Button = button, DialogId = dialogId, Message = ex.Message };
+        }
+    }
+
     /// <summary>
     /// ExecuteCommand throws when a command is disabled or unknown, which for Test Explorer is
     /// the normal state before discovery finishes. Probing first keeps that an ordinary result
