@@ -1066,25 +1066,24 @@ public class VisualStudioService : IVisualStudioService
     {
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
         var dte = await GetDteAsync();
-        var result = new WorkspaceSymbolResult();
 
-        if (dte.Solution == null || string.IsNullOrWhiteSpace(query))
+        if (dte.Solution == null || string.IsNullOrWhiteSpace(query) || maxResults < 1)
         {
-            return result;
+            return new WorkspaceSymbolResult();
         }
 
-        var allSymbols = new List<SymbolInfo>();
-        var lowerQuery = query.ToLowerInvariant();
+        var search = new WorkspaceSymbolSearch(query, maxResults);
 
         foreach (EnvDTE.Project project in dte.Solution.Projects)
         {
+            if (search.IsComplete)
+            {
+                break;
+            }
+
             try
             {
-                CollectProjectSymbols(project.ProjectItems, allSymbols, lowerQuery, maxResults * 2);
-                if (allSymbols.Count >= maxResults * 2)
-                {
-                    break;
-                }
+                CollectProjectSymbols(project.ProjectItems, search);
             }
             catch (Exception ex)
             {
@@ -1092,41 +1091,36 @@ public class VisualStudioService : IVisualStudioService
             }
         }
 
-        var matchingSymbols = allSymbols
-            .Where(s => s.Name.ToLowerInvariant().Contains(lowerQuery) ||
-                       s.FullName.ToLowerInvariant().Contains(lowerQuery))
-            .Take(maxResults)
-            .ToList();
-
-        result.Symbols = matchingSymbols;
-        result.TotalCount = allSymbols.Count;
-        result.Truncated = allSymbols.Count > maxResults;
-
-        return result;
+        return search.ToResult();
     }
 
-    private void CollectProjectSymbols(ProjectItems? items, List<SymbolInfo> allSymbols, string query, int limit)
+    private void CollectProjectSymbols(ProjectItems? items, WorkspaceSymbolSearch search)
     {
         ThreadHelper.ThrowIfNotOnUIThread();
 
-        if (items == null || allSymbols.Count >= limit)
+        if (items == null)
         {
             return;
         }
 
         foreach (ProjectItem item in items)
         {
+            if (search.IsComplete)
+            {
+                return;
+            }
+
             try
             {
-                if (item.FileCodeModel != null)
+                var codeModel = item.FileCodeModel;
+                if (codeModel != null)
                 {
-                    var filePath = item.FileNames[1];
-                    CollectCodeElements(item.FileCodeModel.CodeElements, allSymbols, filePath, string.Empty, query, limit);
+                    CollectCodeElements(codeModel.CodeElements, search, item.FileNames[1], string.Empty);
                 }
 
                 if (item.ProjectItems != null && item.ProjectItems.Count > 0)
                 {
-                    CollectProjectSymbols(item.ProjectItems, allSymbols, query, limit);
+                    CollectProjectSymbols(item.ProjectItems, search);
                 }
             }
             catch (Exception ex)
@@ -1136,17 +1130,21 @@ public class VisualStudioService : IVisualStudioService
         }
     }
 
-    private void CollectCodeElements(CodeElements elements, List<SymbolInfo> allSymbols, string filePath, string containerName, string query, int limit)
+    /// <remarks>
+    /// Checks <see cref="WorkspaceSymbolSearch.IsComplete"/> before every element, so the walk stops
+    /// at the match that settles the result rather than at the end of the current file or type.
+    /// </remarks>
+    private void CollectCodeElements(CodeElements elements, WorkspaceSymbolSearch search, string filePath, string containerName)
     {
         ThreadHelper.ThrowIfNotOnUIThread();
 
-        if (allSymbols.Count >= limit)
-        {
-            return;
-        }
-
         foreach (CodeElement element in elements)
         {
+            if (search.IsComplete)
+            {
+                return;
+            }
+
             try
             {
                 var kind = MapElementKind(element.Kind);
@@ -1155,15 +1153,12 @@ public class VisualStudioService : IVisualStudioService
                     continue;
                 }
 
-                var lowerName = element.Name.ToLowerInvariant();
-                var lowerFullName = element.FullName.ToLowerInvariant();
-
-                if (lowerName.Contains(query) || lowerFullName.Contains(query))
+                if (search.Matches(element.Name, element.FullName))
                 {
                     var startPoint = element.StartPoint;
                     var endPoint = element.EndPoint;
 
-                    allSymbols.Add(new SymbolInfo
+                    search.Add(new SymbolInfo
                     {
                         Name = element.Name,
                         FullName = element.FullName,
@@ -1180,7 +1175,7 @@ public class VisualStudioService : IVisualStudioService
                 var childElements = GetChildElements(element);
                 if (childElements != null)
                 {
-                    CollectCodeElements(childElements, allSymbols, filePath, element.Name, query, limit);
+                    CollectCodeElements(childElements, search, filePath, element.Name);
                 }
             }
             catch (Exception ex)

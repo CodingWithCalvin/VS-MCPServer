@@ -48,7 +48,11 @@ public class LocationInfo
 public class WorkspaceSymbolResult
 {
     public List<SymbolInfo> Symbols { get; set; } = new();
-    public int TotalCount { get; set; }
+
+    /// <summary>
+    /// True when more symbols matched than were returned. There is deliberately no total count:
+    /// the search stops as soon as this is known, rather than walking the whole solution.
+    /// </summary>
     public bool Truncated { get; set; }
 }
 
