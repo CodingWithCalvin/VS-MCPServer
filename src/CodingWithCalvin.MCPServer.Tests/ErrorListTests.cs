@@ -99,9 +99,9 @@ public class ErrorListTests
             (entry, severity) =>
             {
                 created++;
-                return new ErrorItemInfo { Severity = severity };
+                return Entry(severity);
             },
-            severityFilter: null,
+            Filter(),
             maxResults: 10);
 
         Assert.Equal(10, created);
@@ -116,8 +116,8 @@ public class ErrorListTests
         var result = VisualStudioService.CollectErrorListEntries(
             entries,
             entry => entry,
-            (entry, severity) => new ErrorItemInfo { Severity = severity },
-            severityFilter: null,
+            (entry, severity) => Entry(severity),
+            Filter(),
             maxResults: 100);
 
         Assert.Equal(2, result.Items.Count);
@@ -134,8 +134,8 @@ public class ErrorListTests
         var result = VisualStudioService.CollectErrorListEntries(
             entries,
             entry => entry,
-            (entry, severity) => index++ == 1 ? null : new ErrorItemInfo { Severity = severity },
-            severityFilter: null,
+            (entry, severity) => index++ == 1 ? null : Entry(severity),
+            Filter(),
             maxResults: 100);
 
         Assert.Equal(2, result.Items.Count);
@@ -144,12 +144,80 @@ public class ErrorListTests
         Assert.False(result.Truncated);
     }
 
+    [Fact]
+    public void CollectErrorListEntries_ReportsMatchedCount_PastTheCap()
+    {
+        var entries = Entries(errors: 250, warnings: 5, messages: 0);
+
+        var result = Collect(entries, severityFilter: "Error", maxResults: 100);
+
+        Assert.Equal(100, result.Items.Count);
+        Assert.Equal(250, result.MatchedCount);
+        Assert.True(result.Truncated);
+    }
+
+    [Fact]
+    public void CollectErrorListEntries_ReadsEveryEntry_WhenAFilterNeedsItsDetails()
+    {
+        // Past the cap, a code filter cannot tell whether an entry matches without reading it.
+        var created = 0;
+        var filter = new ErrorListFilter(
+            new ErrorListQuery { Codes = new List<string> { "CS0103" } },
+            new ErrorListScopeContext());
+
+        var result = VisualStudioService.CollectErrorListEntries(
+            Entries(errors: 50, warnings: 0, messages: 0),
+            entry => entry,
+            (entry, severity) =>
+            {
+                var code = created++ % 2 == 0 ? "CS0103" : "CS0168";
+                return new ErrorListEntry(
+                    new ErrorItemInfo { Severity = severity, ErrorCode = code },
+                    Array.Empty<string>(),
+                    Array.Empty<Guid>());
+            },
+            filter,
+            maxResults: 10);
+
+        Assert.Equal(50, created);
+        Assert.Equal(10, result.Items.Count);
+        Assert.All(result.Items, item => Assert.Equal("CS0103", item.ErrorCode));
+        Assert.Equal(25, result.MatchedCount);
+        Assert.Equal(50, result.TotalCount);
+        Assert.True(result.Truncated);
+    }
+
+    [Fact]
+    public void CollectErrorListEntries_EntriesThatFailToRead_NeverMatchADetailFilter()
+    {
+        var filter = new ErrorListFilter(
+            new ErrorListQuery { Search = "anything" },
+            new ErrorListScopeContext());
+
+        var result = VisualStudioService.CollectErrorListEntries(
+            Entries(errors: 3, warnings: 0, messages: 0),
+            entry => entry,
+            (entry, severity) => null,
+            filter,
+            maxResults: 100);
+
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.MatchedCount);
+        Assert.Equal(3, result.TotalCount);
+    }
+
+    private static ErrorListFilter Filter(string? severityFilter = null) =>
+        new(new ErrorListQuery { Severity = severityFilter }, new ErrorListScopeContext());
+
+    private static ErrorListEntry Entry(string severity) =>
+        new(new ErrorItemInfo { Severity = severity }, Array.Empty<string>(), Array.Empty<Guid>());
+
     private static ErrorListResult Collect(IEnumerable<string> entries, string? severityFilter, int maxResults) =>
         VisualStudioService.CollectErrorListEntries(
             entries,
             entry => entry,
-            (entry, severity) => new ErrorItemInfo { Severity = severity },
-            severityFilter,
+            (entry, severity) => Entry(severity),
+            Filter(severityFilter),
             maxResults);
 
     // Interleaves severities so capping and filtering cannot pass by relying on order.

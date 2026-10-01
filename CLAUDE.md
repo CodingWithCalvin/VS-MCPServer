@@ -195,10 +195,12 @@ dotnet build src/CodingWithCalvin.VSMCP/CodingWithCalvin.VSMCP.csproj
 - `debugger_stop` - Stop debugging (Shift+F5)
 
 ### Diagnostics Tools
-- `errors_list` - Read build errors, warnings, and messages from the Error List
+- `errors_list` - Read errors, warnings, and messages from the Error List, filtered by severity, scope, Build/IntelliSense source, suppression state, code, tool, category, project, path, or text
 - `output_list_panes` - List all available Output window panes
 - `output_read` - Read content from an Output window pane
 - `output_write` - Write a message to an Output window pane
+
+`errors_list` reads `IWpfTableControl.Entries`, which holds only what the Error List window displays, so the window's own scope and filters apply before the tool's filters. Its severity and Build/IntelliSense filters are readable through `IErrorList` and reported in `Notes`; its column filters are not, and the Suppression State column hides suppressed entries by default. The scope drop-down is internal API, so the tool's `scope` is resolved from the active document, open documents, and the active document's project instead. Changed Documents scope is not supported. Entries from shared files carry `ProjectNames` / `ProjectGuids` instead of `ProjectName` / `ProjectGuid`, so project matching reads both.
 
 ### Test Tools
 - `test_cancel` - Cancel the test run in progress

@@ -110,7 +110,7 @@
 
 | Tool | Description |
 |------|-------------|
-| `errors_list` | Read build errors, warnings, and messages from the Error List |
+| `errors_list` | Read errors, warnings, and messages from the Error List, filtered by severity, scope, Build/IntelliSense source, suppression state, code, tool, category, project, path, or text |
 | `output_list_panes` | List all available Output window panes |
 | `output_read` | Read content from an Output window pane |
 | `output_write` | Write a message to an Output window pane |

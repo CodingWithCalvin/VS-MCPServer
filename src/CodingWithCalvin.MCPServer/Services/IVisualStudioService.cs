@@ -70,7 +70,7 @@ public interface IVisualStudioService
     Task<bool> DebugSetVariableValueAsync(string variableName, string value);
     Task<List<CallStackFrameInfo>> DebugGetCallStackAsync();
 
-    Task<ErrorListResult> GetErrorListAsync(string? severity = null, int maxResults = 100);
+    Task<ErrorListResult> GetErrorListAsync(ErrorListQuery query);
     Task<OutputReadResult> ReadOutputPaneAsync(string paneIdentifier);
     Task<bool> WriteOutputPaneAsync(string paneIdentifier, string message, bool activate = false);
     Task<List<OutputPaneInfo>> GetOutputPanesAsync();
