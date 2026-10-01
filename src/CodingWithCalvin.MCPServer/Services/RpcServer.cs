@@ -281,8 +281,7 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
     public Task<bool> DebugSetVariableValueAsync(string variableName, string value) => _vsService.DebugSetVariableValueAsync(variableName, value);
     public Task<List<CallStackFrameInfo>> DebugGetCallStackAsync() => _vsService.DebugGetCallStackAsync();
 
-    public Task<ErrorListResult> GetErrorListAsync(string? severity = null, int maxResults = 100)
-        => _vsService.GetErrorListAsync(severity, maxResults);
+    public Task<ErrorListResult> GetErrorListAsync(ErrorListQuery query) => _vsService.GetErrorListAsync(query);
     public Task<OutputReadResult> ReadOutputPaneAsync(string paneIdentifier) => _vsService.ReadOutputPaneAsync(paneIdentifier);
     public Task<bool> WriteOutputPaneAsync(string paneIdentifier, string message, bool activate = false)
         => _vsService.WriteOutputPaneAsync(paneIdentifier, message, activate);

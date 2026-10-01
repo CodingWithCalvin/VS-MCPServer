@@ -2165,7 +2165,7 @@ public class VisualStudioService : IVisualStudioService
         return results;
     }
 
-    public async Task<ErrorListResult> GetErrorListAsync(string? severity = null, int maxResults = 100)
+    public async Task<ErrorListResult> GetErrorListAsync(ErrorListQuery query)
     {
         var result = new ErrorListResult();
 
@@ -2208,12 +2208,29 @@ public class VisualStudioService : IVisualStudioService
                 return result;
             }
 
+            // Entries is only what the window displays, so anything its own filters hide is invisible here
+            var notes = new List<string>();
+            var hiddenEntries = ErrorListFilter.DescribeHiddenEntries(
+                errorList.AreErrorsShown,
+                errorList.AreWarningsShown,
+                errorList.AreMessagesShown,
+                errorList.AreBuildErrorSourceEntriesShown,
+                errorList.AreOtherErrorSourceEntriesShown);
+            if (hiddenEntries != null)
+            {
+                notes.Add(hiddenEntries);
+            }
+
+            var dte = await GetDteAsync();
+            var filter = new ErrorListFilter(query, GetErrorListScopeContext(dte, query.Scope, notes));
+
             result = CollectErrorListEntries(
                 tableControl.Entries,
                 GetErrorListSeverity,
-                CreateErrorItem,
-                severity,
-                maxResults);
+                CreateErrorListEntry,
+                filter,
+                query.MaxResults);
+            result.Notes.AddRange(notes);
         }
         catch (Exception ex)
         {
@@ -2230,18 +2247,20 @@ public class VisualStudioService : IVisualStudioService
 
     /// <summary>
     /// Counts every Error List entry by severity, and collects up to <paramref name="maxResults"/>
-    /// of the entries that match <paramref name="severityFilter"/>.
+    /// of the entries that match <paramref name="filter"/>.
     /// </summary>
     /// <remarks>
     /// The counts cover the whole Error List, not just the returned items, so the caller can tell
-    /// how much was filtered out or cut off. Entries past the cap are counted but never read in full.
-    /// An entry whose severity cannot be read (<paramref name="getSeverity"/> returns null) is skipped.
+    /// how much was filtered out or cut off. Entries past the cap are counted but only read in full
+    /// when a filter other than severity needs their details to decide whether they match.
+    /// An entry whose severity cannot be read (<paramref name="getSeverity"/> returns null) is skipped,
+    /// and one whose details cannot be read (<paramref name="createEntry"/> returns null) never matches.
     /// </remarks>
     internal static ErrorListResult CollectErrorListEntries<TEntry>(
         IEnumerable<TEntry> entries,
         Func<TEntry, string?> getSeverity,
-        Func<TEntry, string, ErrorItemInfo?> createItem,
-        string? severityFilter,
+        Func<TEntry, string, ErrorListEntry?> createEntry,
+        ErrorListFilter filter,
         int maxResults)
     {
         var result = new ErrorListResult();
@@ -2260,25 +2279,31 @@ public class VisualStudioService : IVisualStudioService
             else if (severity == "Warning") result.WarningCount++;
             else result.MessageCount++;
 
-            if (!string.IsNullOrEmpty(severityFilter) &&
-                !severity.Equals(severityFilter, StringComparison.OrdinalIgnoreCase))
+            if (!filter.MatchesSeverity(severity))
+            {
+                continue;
+            }
+
+            if (matchedCount >= maxResults && !filter.NeedsEntryDetails)
+            {
+                matchedCount++;
+                continue;
+            }
+
+            var errorListEntry = createEntry(entry, severity);
+            if (errorListEntry == null || !filter.Matches(errorListEntry))
             {
                 continue;
             }
 
             matchedCount++;
-            if (matchedCount > maxResults)
+            if (matchedCount <= maxResults)
             {
-                continue;
-            }
-
-            var item = createItem(entry, severity);
-            if (item != null)
-            {
-                result.Items.Add(item);
+                result.Items.Add(errorListEntry.Item);
             }
         }
 
+        result.MatchedCount = matchedCount;
         result.Truncated = matchedCount > maxResults;
         return result;
     }
@@ -2307,20 +2332,81 @@ public class VisualStudioService : IVisualStudioService
         }
     }
 
-    private static ErrorItemInfo? CreateErrorItem(ITableEntryHandle entry, string severity)
+    private static ErrorListEntry? CreateErrorListEntry(ITableEntryHandle entry, string severity)
     {
         try
         {
             var item = new ErrorItemInfo { Severity = severity };
+            var projectNames = new List<string>();
+            var projectGuids = new List<Guid>();
 
             if (entry.TryGetValue(StandardTableKeyNames.ErrorCode, out object codeObj))
             {
                 item.ErrorCode = codeObj as string ?? "";
             }
 
-            if (entry.TryGetValue(StandardTableKeyNames.ProjectName, out object projectObj))
+            // An error in a shared file belongs to several projects, in which case ProjectName and
+            // ProjectGuid are null and the plural keys carry them instead
+            if (entry.TryGetValue(StandardTableKeyNames.ProjectName, out object projectObj) &&
+                projectObj is string projectName &&
+                projectName.Length > 0)
             {
-                item.Project = projectObj as string ?? "";
+                projectNames.Add(projectName);
+            }
+
+            if (entry.TryGetValue(StandardTableKeyNames.ProjectNames, out object projectNamesObj) &&
+                projectNamesObj is IEnumerable<string> entryProjectNames)
+            {
+                foreach (var name in entryProjectNames)
+                {
+                    if (!string.IsNullOrEmpty(name) && !projectNames.Contains(name))
+                    {
+                        projectNames.Add(name);
+                    }
+                }
+            }
+
+            if (entry.TryGetValue(StandardTableKeyNames.ProjectGuid, out object projectGuidObj) &&
+                projectGuidObj is Guid projectGuid &&
+                projectGuid != Guid.Empty)
+            {
+                projectGuids.Add(projectGuid);
+            }
+
+            if (entry.TryGetValue(StandardTableKeyNames.ProjectGuids, out object projectGuidsObj) &&
+                projectGuidsObj is IEnumerable<Guid> entryProjectGuids)
+            {
+                foreach (var guid in entryProjectGuids)
+                {
+                    if (guid != Guid.Empty && !projectGuids.Contains(guid))
+                    {
+                        projectGuids.Add(guid);
+                    }
+                }
+            }
+
+            item.Project = string.Join(", ", projectNames);
+
+            if (entry.TryGetValue(StandardTableKeyNames.ErrorSource, out object sourceObj) &&
+                sourceObj is ErrorSource errorSource)
+            {
+                item.Source = GetErrorSourceName(errorSource);
+            }
+
+            if (entry.TryGetValue(StandardTableKeyNames.BuildTool, out object toolObj))
+            {
+                item.Tool = toolObj as string ?? "";
+            }
+
+            if (entry.TryGetValue(StandardTableKeyNames.ErrorCategory, out object categoryObj))
+            {
+                item.Category = categoryObj as string ?? "";
+            }
+
+            if (entry.TryGetValue(StandardTableKeyNames.SuppressionState, out object suppressionObj) &&
+                suppressionObj is SuppressionState suppressionState)
+            {
+                item.SuppressionState = GetSuppressionStateName(suppressionState);
             }
 
             if (entry.TryGetValue(StandardTableKeyNames.Text, out object textObj))
@@ -2343,13 +2429,121 @@ public class VisualStudioService : IVisualStudioService
                 item.Column = column;
             }
 
-            return item;
+            return new ErrorListEntry(item, projectNames, projectGuids);
         }
         catch (Exception ex)
         {
             VsixTelemetry.TrackException(ex);
             return null;
         }
+    }
+
+    internal static string GetErrorSourceName(ErrorSource source) =>
+        source switch
+        {
+            ErrorSource.Build => ErrorListFilter.BuildSource,
+            ErrorSource.Other => ErrorListFilter.IntelliSenseSource,
+            _ => string.Empty
+        };
+
+    internal static string GetSuppressionStateName(SuppressionState state) =>
+        state switch
+        {
+            SuppressionState.Active => nameof(ErrorListSuppressionState.Active),
+            SuppressionState.Suppressed => nameof(ErrorListSuppressionState.Suppressed),
+            SuppressionState.NotApplicable => nameof(ErrorListSuppressionState.NotApplicable),
+            _ => string.Empty
+        };
+
+    private ErrorListScopeContext GetErrorListScopeContext(DTE2 dte, ErrorListScope scope, List<string> notes)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        var context = new ErrorListScopeContext();
+
+        switch (scope)
+        {
+            case ErrorListScope.CurrentDocument:
+            {
+                context.ActiveDocumentPath = dte.ActiveDocument?.FullName;
+                if (context.ActiveDocumentPath == null)
+                {
+                    notes.Add("No document is active, so the currentDocument scope matches nothing.");
+                }
+
+                break;
+            }
+
+            case ErrorListScope.OpenDocuments:
+            {
+                var paths = new List<string>();
+                foreach (Document doc in dte.Documents)
+                {
+                    try
+                    {
+                        paths.Add(doc.FullName);
+                    }
+                    catch (Exception ex)
+                    {
+                        VsixTelemetry.TrackException(ex);
+                    }
+                }
+
+                context.OpenDocumentPaths = paths;
+                if (paths.Count == 0)
+                {
+                    notes.Add("No documents are open, so the openDocuments scope matches nothing.");
+                }
+
+                break;
+            }
+
+            case ErrorListScope.CurrentProject:
+            {
+                var activeDocument = dte.ActiveDocument;
+                if (activeDocument == null)
+                {
+                    notes.Add("No document is active, so the currentProject scope matches nothing. It uses the project containing the active document.");
+                    break;
+                }
+
+                var project = activeDocument.ProjectItem?.ContainingProject;
+                if (project == null ||
+                    string.Equals(project.Kind, EnvDTE.Constants.vsProjectKindMisc, StringComparison.OrdinalIgnoreCase))
+                {
+                    notes.Add("The active document does not belong to a project, so the currentProject scope matches nothing.");
+                    break;
+                }
+
+                context.CurrentProjectName = project.Name;
+                context.CurrentProjectGuid = GetProjectGuid(project);
+                break;
+            }
+        }
+
+        return context;
+    }
+
+    private Guid GetProjectGuid(EnvDTE.Project project)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        try
+        {
+            if (ServiceProvider.GetService(typeof(SVsSolution)) is IVsSolution solution &&
+                ErrorHandler.Succeeded(solution.GetProjectOfUniqueName(project.UniqueName, out var hierarchy)) &&
+                ErrorHandler.Succeeded(solution.GetGuidOfProject(hierarchy, out var projectGuid)))
+            {
+                return projectGuid;
+            }
+        }
+        catch (Exception ex)
+        {
+            VsixTelemetry.TrackException(ex);
+        }
+
+        // Matching falls back to the project name
+        return Guid.Empty;
     }
 
     public async Task<List<OutputPaneInfo>> GetOutputPanesAsync()
