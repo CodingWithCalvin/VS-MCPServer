@@ -2208,114 +2208,12 @@ public class VisualStudioService : IVisualStudioService
                 return result;
             }
 
-            int count = 0;
-            var severityFilter = severity?.ToLowerInvariant();
-
-            // Enumerate through error list entries
-            foreach (ITableEntryHandle entry in tableControl.Entries)
-            {
-                if (count >= maxResults)
-                    break;
-
-                try
-                {
-                    // Get error properties from the table entry
-                    string errorCode = "";
-                    string projectName = "";
-                    string text = "";
-                    string documentName = "";
-                    int line = 0;
-                    int column = 0;
-                    string severityStr = "Message";
-
-                    // Extract all available properties
-                    if (entry.TryGetValue(StandardTableKeyNames.ErrorCode, out object codeObj))
-                    {
-                        errorCode = codeObj as string ?? "";
-                    }
-
-                    if (entry.TryGetValue(StandardTableKeyNames.ProjectName, out object projectObj))
-                    {
-                        projectName = projectObj as string ?? "";
-                    }
-
-                    if (entry.TryGetValue(StandardTableKeyNames.Text, out object textObj))
-                    {
-                        text = textObj as string ?? "";
-                    }
-
-                    if (entry.TryGetValue(StandardTableKeyNames.DocumentName, out object docObj))
-                    {
-                        documentName = docObj as string ?? "";
-                    }
-
-                    // Get line number
-                    if (entry.TryGetValue(StandardTableKeyNames.Line, out object lineObj) && lineObj is int lineInt)
-                    {
-                        line = lineInt;
-                    }
-
-                    // Get column number
-                    if (entry.TryGetValue(StandardTableKeyNames.Column, out object colObj) && colObj is int colInt)
-                    {
-                        column = colInt;
-                    }
-
-                    // Get error severity
-                    if (entry.TryGetValue(StandardTableKeyNames.ErrorSeverity, out object severityObj) &&
-                        severityObj is __VSERRORCATEGORY errorCategory)
-                    {
-                        severityStr = errorCategory switch
-                        {
-                            __VSERRORCATEGORY.EC_ERROR => "Error",
-                            __VSERRORCATEGORY.EC_WARNING => "Warning",
-                            __VSERRORCATEGORY.EC_MESSAGE => "Message",
-                            _ => "Message"
-                        };
-                    }
-
-                    // Apply severity filter if specified
-                    if (!string.IsNullOrEmpty(severityFilter) &&
-                        !severityStr.Equals(severityFilter, StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
-                    // Add the error item to results
-                    result.Items.Add(new ErrorItemInfo
-                    {
-                        FilePath = documentName,
-                        Line = line,
-                        Column = column,
-                        Description = text,
-                        Severity = severityStr,
-                        ErrorCode = errorCode,
-                        Project = projectName
-                    });
-
-                    count++;
-
-                    // Count by severity
-                    if (severityStr == "Error") result.ErrorCount++;
-                    else if (severityStr == "Warning") result.WarningCount++;
-                    else result.MessageCount++;
-                }
-                catch (Exception itemEx)
-                {
-                    VsixTelemetry.TrackException(itemEx);
-                }
-            }
-
-            result.TotalCount = count;
-
-            if (count == 0)
-            {
-                result.Items.Add(new ErrorItemInfo
-                {
-                    Description = "No errors or warnings in the Error List. Build the project to populate the Error List.",
-                    Severity = "Message"
-                });
-            }
+            result = CollectErrorListEntries(
+                tableControl.Entries,
+                GetErrorListSeverity,
+                CreateErrorItem,
+                severity,
+                maxResults);
         }
         catch (Exception ex)
         {
@@ -2328,6 +2226,130 @@ public class VisualStudioService : IVisualStudioService
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Counts every Error List entry by severity, and collects up to <paramref name="maxResults"/>
+    /// of the entries that match <paramref name="severityFilter"/>.
+    /// </summary>
+    /// <remarks>
+    /// The counts cover the whole Error List, not just the returned items, so the caller can tell
+    /// how much was filtered out or cut off. Entries past the cap are counted but never read in full.
+    /// An entry whose severity cannot be read (<paramref name="getSeverity"/> returns null) is skipped.
+    /// </remarks>
+    internal static ErrorListResult CollectErrorListEntries<TEntry>(
+        IEnumerable<TEntry> entries,
+        Func<TEntry, string?> getSeverity,
+        Func<TEntry, string, ErrorItemInfo?> createItem,
+        string? severityFilter,
+        int maxResults)
+    {
+        var result = new ErrorListResult();
+        var matchedCount = 0;
+
+        foreach (var entry in entries)
+        {
+            var severity = getSeverity(entry);
+            if (severity == null)
+            {
+                continue;
+            }
+
+            result.TotalCount++;
+            if (severity == "Error") result.ErrorCount++;
+            else if (severity == "Warning") result.WarningCount++;
+            else result.MessageCount++;
+
+            if (!string.IsNullOrEmpty(severityFilter) &&
+                !severity.Equals(severityFilter, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            matchedCount++;
+            if (matchedCount > maxResults)
+            {
+                continue;
+            }
+
+            var item = createItem(entry, severity);
+            if (item != null)
+            {
+                result.Items.Add(item);
+            }
+        }
+
+        result.Truncated = matchedCount > maxResults;
+        return result;
+    }
+
+    private static string? GetErrorListSeverity(ITableEntryHandle entry)
+    {
+        try
+        {
+            if (entry.TryGetValue(StandardTableKeyNames.ErrorSeverity, out object severityObj) &&
+                severityObj is __VSERRORCATEGORY errorCategory)
+            {
+                return errorCategory switch
+                {
+                    __VSERRORCATEGORY.EC_ERROR => "Error",
+                    __VSERRORCATEGORY.EC_WARNING => "Warning",
+                    _ => "Message"
+                };
+            }
+
+            return "Message";
+        }
+        catch (Exception ex)
+        {
+            VsixTelemetry.TrackException(ex);
+            return null;
+        }
+    }
+
+    private static ErrorItemInfo? CreateErrorItem(ITableEntryHandle entry, string severity)
+    {
+        try
+        {
+            var item = new ErrorItemInfo { Severity = severity };
+
+            if (entry.TryGetValue(StandardTableKeyNames.ErrorCode, out object codeObj))
+            {
+                item.ErrorCode = codeObj as string ?? "";
+            }
+
+            if (entry.TryGetValue(StandardTableKeyNames.ProjectName, out object projectObj))
+            {
+                item.Project = projectObj as string ?? "";
+            }
+
+            if (entry.TryGetValue(StandardTableKeyNames.Text, out object textObj))
+            {
+                item.Description = textObj as string ?? "";
+            }
+
+            if (entry.TryGetValue(StandardTableKeyNames.DocumentName, out object docObj))
+            {
+                item.FilePath = docObj as string ?? "";
+            }
+
+            if (entry.TryGetValue(StandardTableKeyNames.Line, out object lineObj) && lineObj is int line)
+            {
+                item.Line = line;
+            }
+
+            if (entry.TryGetValue(StandardTableKeyNames.Column, out object colObj) && colObj is int column)
+            {
+                item.Column = column;
+            }
+
+            return item;
+        }
+        catch (Exception ex)
+        {
+            VsixTelemetry.TrackException(ex);
+            return null;
+        }
     }
 
     public async Task<List<OutputPaneInfo>> GetOutputPanesAsync()

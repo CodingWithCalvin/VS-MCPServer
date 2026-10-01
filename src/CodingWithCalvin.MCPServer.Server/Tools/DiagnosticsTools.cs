@@ -18,7 +18,7 @@ public class DiagnosticsTools
     }
 
     [McpServerTool(Name = "errors_list", ReadOnly = true)]
-    [Description("Get errors, warnings, and messages from the Error List. Returns diagnostics with file, line, description, and severity. Filter by severity to focus on specific issues.")]
+    [Description("Get errors, warnings, and messages from the Error List. Returns diagnostics with file, line, description, and severity. Filter by severity to focus on specific issues. TotalCount, ErrorCount, WarningCount, and MessageCount always cover the whole Error List, regardless of the severity filter or maxResults. Truncated is true when more entries matched than maxResults allowed. An empty Error List can mean nothing has been built yet; build the solution to populate it.")]
     public async Task<string> GetErrorListAsync(
         [Description("Filter by severity: \"Error\", \"Warning\", \"Message\", or null for all. Case-insensitive.")]
         string? severity = null,
