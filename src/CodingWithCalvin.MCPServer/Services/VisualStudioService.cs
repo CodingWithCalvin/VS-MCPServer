@@ -1122,6 +1122,11 @@ public class VisualStudioService : IVisualStudioService
                 {
                     CollectProjectSymbols(item.ProjectItems, search);
                 }
+
+				if (item.ContainingProject.Kind == ProjectKinds.vsProjectKindSolutionFolder && item.SubProject != null)
+				{
+					CollectProjectSymbols(item.SubProject.ProjectItems, search);
+				}
             }
             catch (Exception ex)
             {
