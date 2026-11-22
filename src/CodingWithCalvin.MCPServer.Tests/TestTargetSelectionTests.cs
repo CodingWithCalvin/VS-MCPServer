@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using CodingWithCalvin.MCPServer.Services;
 using CodingWithCalvin.MCPServer.Shared.Models;
@@ -5,103 +6,82 @@ using Xunit;
 
 namespace CodingWithCalvin.MCPServer.Tests;
 
-/// <summary>
-/// Covers how a caller-supplied test name is resolved to the symbol the caret gets placed on.
-/// Test Explorer's run-in-context commands act on the caret, so picking the wrong symbol here
-/// silently runs the wrong tests rather than failing.
-/// </summary>
 public class TestTargetSelectionTests
 {
-    [Fact]
-    public void SelectTestTarget_PrefersExactFullNameOverSimpleName()
-    {
-        var candidates = new List<SymbolInfo>
-        {
-            Symbol("CalculatorTests", "Other.CalculatorTests", SymbolKind.Class),
-            Symbol("CalculatorTests", "MyApp.Tests.CalculatorTests", SymbolKind.Class)
-        };
+	[Fact]
+	public void FindTestsForTarget_PrefersExactFullyQualifiedName()
+	{
+		var tests = new List<TestExplorerTestInfo>
+		{
+			Test("MyApp.Tests.CalculatorTests.Add_ReturnsSum", "Add_ReturnsSum"),
+			Test("MyApp.Tests.CalculatorTests.Add_ReturnsDifference", "Add_ReturnsDifference")
+		};
 
-        var selected = VisualStudioService.SelectTestTarget(candidates, "MyApp.Tests.CalculatorTests");
+		var selected = TestExplorerInterop.FindTestsForTarget(
+			tests,
+			"MyApp.Tests.CalculatorTests.Add_ReturnsSum");
 
-        Assert.Equal("MyApp.Tests.CalculatorTests", selected?.FullName);
-    }
+		Assert.Equal("MyApp.Tests.CalculatorTests.Add_ReturnsSum", Assert.Single(selected).FullyQualifiedName);
+	}
 
-    [Fact]
-    public void SelectTestTarget_MatchesSimpleName()
-    {
-        var candidates = new List<SymbolInfo>
-        {
-            Symbol("Helper", "MyApp.Tests.Helper", SymbolKind.Class),
-            Symbol("Add_ReturnsSum", "MyApp.Tests.CalculatorTests.Add_ReturnsSum", SymbolKind.Function)
-        };
+	[Fact]
+	public void FindTestsForTarget_SelectsAllTestsInFullyQualifiedClass()
+	{
+		var tests = new List<TestExplorerTestInfo>
+		{
+			Test("MyApp.Tests.CalculatorTests.Add_ReturnsSum", "Add_ReturnsSum"),
+			Test("MyApp.Tests.CalculatorTests.Add_ReturnsDifference", "Add_ReturnsDifference"),
+			Test("MyApp.Tests.StringTests.Trim", "Trim")
+		};
 
-        var selected = VisualStudioService.SelectTestTarget(candidates, "Add_ReturnsSum");
+		var selected = TestExplorerInterop.FindTestsForTarget(tests, "MyApp.Tests.CalculatorTests");
 
-        Assert.Equal("MyApp.Tests.CalculatorTests.Add_ReturnsSum", selected?.FullName);
-    }
+		Assert.Equal(2, selected.Count);
+	}
 
-    [Fact]
-    public void SelectTestTarget_FallsBackToTrailingSegmentMatch()
-    {
-        var candidates = new List<SymbolInfo>
-        {
-            Symbol("Unrelated", "MyApp.Tests.Unrelated", SymbolKind.Class),
-            Symbol("Add_ReturnsSum", "MyApp.Tests.CalculatorTests.Add_ReturnsSum", SymbolKind.Function)
-        };
+	[Fact]
+	public void FindTestsForTarget_ReturnsAllSimpleNameMatchesForAmbiguityHandling()
+	{
+		var tests = new List<TestExplorerTestInfo>
+		{
+			Test("MyApp.Tests.CalculatorTests.Add", "Add"),
+			Test("MyApp.Tests.OtherTests.Add", "Add")
+		};
 
-        var selected = VisualStudioService.SelectTestTarget(
-            candidates,
-            "CalculatorTests.Add_ReturnsSum");
+		var selected = TestExplorerInterop.FindTestsForTarget(tests, "Add");
 
-        Assert.Equal("MyApp.Tests.CalculatorTests.Add_ReturnsSum", selected?.FullName);
-    }
+		Assert.Equal(2, selected.Count);
+	}
 
-    [Fact]
-    public void SelectTestTarget_PrefersExactSimpleNameOverTrailingSegment()
-    {
-        var candidates = new List<SymbolInfo>
-        {
-            Symbol("Nested", "MyApp.Tests.Outer.Nested", SymbolKind.Class),
-            Symbol("Nested", "MyApp.Tests.Nested", SymbolKind.Class)
-        };
+	[Fact]
+	public void FindTestsForTarget_MatchesTestExplorerId()
+	{
+		var id = Guid.NewGuid();
+		var tests = new List<TestExplorerTestInfo>
+		{
+			Test("MyApp.Tests.CalculatorTests.Add", "Add", id),
+			Test("MyApp.Tests.OtherTests.Add", "Add")
+		};
 
-        var selected = VisualStudioService.SelectTestTarget(candidates, "Nested");
+		var selected = TestExplorerInterop.FindTestsForTarget(tests, id.ToString());
 
-        // Both end with ".Nested"; the exact simple-name rule runs first and takes the earlier
-        // candidate, so the result is deterministic rather than dependent on suffix ordering.
-        Assert.Equal("MyApp.Tests.Outer.Nested", selected?.FullName);
-    }
+		Assert.Equal(id.ToString(), Assert.Single(selected).Id);
+	}
 
-    [Fact]
-    public void SelectTestTarget_ReturnsNull_WhenNoCandidates()
-    {
-        var selected = VisualStudioService.SelectTestTarget(new List<SymbolInfo>(), "Anything");
+	[Fact]
+	public void FindTestsForTarget_ReturnsEmpty_WhenNoTestsMatch()
+	{
+		var selected = TestExplorerInterop.FindTestsForTarget(
+			new List<TestExplorerTestInfo> { Test("MyApp.Tests.CalculatorTests.Add", "Add") },
+			"MissingTest");
 
-        Assert.Null(selected);
-    }
+		Assert.Empty(selected);
+	}
 
-    [Fact]
-    public void SelectTestTarget_FallsBackToFirstCandidate_WhenNothingMatches()
-    {
-        var candidates = new List<SymbolInfo>
-        {
-            Symbol("CalculatorTests", "MyApp.Tests.CalculatorTests", SymbolKind.Class)
-        };
-
-        // The caller's text already matched during the workspace symbol search, so a candidate
-        // that fails the stricter rules here is still a better answer than nothing.
-        var selected = VisualStudioService.SelectTestTarget(candidates, "Calculator");
-
-        Assert.Equal("MyApp.Tests.CalculatorTests", selected?.FullName);
-    }
-
-    private static SymbolInfo Symbol(string name, string fullName, SymbolKind kind) => new()
-    {
-        Name = name,
-        FullName = fullName,
-        Kind = kind,
-        FilePath = @"C:\src\Tests.cs",
-        StartLine = 10,
-        StartColumn = 5
-    };
+	private static TestExplorerTestInfo Test(string fullyQualifiedName, string displayName, Guid? id = null) => new()
+	{
+		Id = (id ?? Guid.NewGuid()).ToString(),
+		FullyQualifiedName = fullyQualifiedName,
+		DisplayName = displayName
+	};
 }

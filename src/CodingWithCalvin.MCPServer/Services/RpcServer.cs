@@ -291,6 +291,16 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
     public Task<bool> DebugAllTestsAsync() => _vsService.DebugAllTestsAsync();
     public Task<TestTargetResult> RunTestsInContextAsync(string target, bool debug)
         => _vsService.RunTestsInContextAsync(target, debug);
+    public Task<TestExplorerTestListResult> GetTestExplorerTestsAsync(string? filter, string? state, int maxResults = 200)
+        => _vsService.GetTestExplorerTestsAsync(filter, state, maxResults);
+    public Task<TestExplorerTestResultsResult> GetTestExplorerResultsAsync(
+        List<string>? testIds,
+        string? filter,
+        bool failedOnly = true,
+        int maxResults = 100)
+        => _vsService.GetTestExplorerResultsAsync(testIds, filter, failedOnly, maxResults);
+    public Task<TestExplorerSelectionResult> RunSelectedTestsAsync(List<string> testIds, bool debug)
+        => _vsService.RunSelectedTestsAsync(testIds, debug);
     public Task<bool> CancelTestRunAsync() => _vsService.CancelTestRunAsync();
     public Task<TestRunStatus> GetTestRunStatusAsync() => _vsService.GetTestRunStatusAsync();
     public Task<TestStats> GetTestStatsAsync() => _vsService.GetTestStatsAsync();

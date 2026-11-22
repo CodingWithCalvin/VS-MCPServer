@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading.Tasks;
 using ModelContextProtocol.Server;
@@ -43,7 +44,7 @@ public class TestTools
     }
 
     [McpServerTool(Name = "test_run", Destructive = false)]
-    [Description("Run the tests in a single test class or test method. Accepts a simple name ('CalculatorTests', 'Add_ReturnsSum') or a fully qualified one ('MyApp.Tests.CalculatorTests.Add_ReturnsSum'); a fully qualified name is matched first and avoids ambiguity. The run starts asynchronously; poll test_status to observe completion.")]
+    [Description("Run tests already discovered by Test Explorer matching a class or test name. This does not move the editor caret. Use test_list and test_run_selected when a name is ambiguous. Poll test_status to observe completion.")]
     public async Task<string> RunTestAsync(
         [Description("Test class or test method name to run. Fully qualified names are preferred when several types share a simple name.")] string target)
     {
@@ -52,11 +53,52 @@ public class TestTools
     }
 
     [McpServerTool(Name = "test_debug", Destructive = false)]
-    [Description("Debug the tests in a single test class or test method, stopping on any breakpoints that are set. Accepts a simple or fully qualified name; a fully qualified name is matched first and avoids ambiguity. The run starts asynchronously; poll test_status to observe completion.")]
+    [Description("Debug tests already discovered by Test Explorer matching a class or test name. This does not move the editor caret. Use test_list and test_debug_selected when a name is ambiguous. Poll test_status to observe completion.")]
     public async Task<string> DebugTestAsync(
         [Description("Test class or test method name to debug. Fully qualified names are preferred when several types share a simple name.")] string target)
     {
         var result = await _rpcClient.RunTestsInContextAsync(target, debug: true);
+        return JsonSerializer.Serialize(result, _jsonOptions);
+    }
+
+    [McpServerTool(Name = "test_list", ReadOnly = true)]
+    [Description("List tests currently discovered by Test Explorer. Filter by fully qualified name, display name, or source; optionally filter by state. Each item includes its Test Explorer ID for test_run_selected or test_debug_selected. Results are capped by maxResults.")]
+    public async Task<string> GetTestExplorerTestsAsync(
+        [Description("Optional case-insensitive substring filter over test name and source.")] string? filter = null,
+        [Description("Optional exact state filter, such as Passed, Failed, Skipped, NotRun, or None.")] string? state = null,
+        [Description("Maximum number of tests to return (1-1000). Defaults to 200.")] int maxResults = 200)
+    {
+        var result = await _rpcClient.GetTestExplorerTestsAsync(filter, state, maxResults);
+        return JsonSerializer.Serialize(result, _jsonOptions);
+    }
+
+    [McpServerTool(Name = "test_run_selected", Destructive = false)]
+    [Description("Run the specified Test Explorer tests by IDs returned from test_list. The run starts asynchronously; poll test_status for progress.")]
+    public async Task<string> RunSelectedTestsAsync(
+        [Description("One or more Test Explorer test IDs returned by test_list.")] List<string> testIds)
+    {
+        var result = await _rpcClient.RunSelectedTestsAsync(testIds, debug: false);
+        return JsonSerializer.Serialize(result, _jsonOptions);
+    }
+
+    [McpServerTool(Name = "test_debug_selected", Destructive = false)]
+    [Description("Debug the specified Test Explorer tests by IDs returned from test_list. The debug run starts asynchronously; poll test_status for progress.")]
+    public async Task<string> DebugSelectedTestsAsync(
+        [Description("One or more Test Explorer test IDs returned by test_list.")] List<string> testIds)
+    {
+        var result = await _rpcClient.RunSelectedTestsAsync(testIds, debug: true);
+        return JsonSerializer.Serialize(result, _jsonOptions);
+    }
+
+    [McpServerTool(Name = "test_results", ReadOnly = true)]
+    [Description("Get structured Test Explorer results, including failed test messages, stack traces, standard output/error, duration, and attachments. By default returns failed results only; use testIds or filter to narrow the results.")]
+    public async Task<string> GetTestExplorerResultsAsync(
+        [Description("Optional Test Explorer IDs returned by test_list.")] List<string>? testIds = null,
+        [Description("Optional case-insensitive substring filter over test name or display name.")] string? filter = null,
+        [Description("Return only failed test results. Defaults to true.")] bool failedOnly = true,
+        [Description("Maximum number of results to return (1-1000). Defaults to 100.")] int maxResults = 100)
+    {
+        var result = await _rpcClient.GetTestExplorerResultsAsync(testIds, filter, failedOnly, maxResults);
         return JsonSerializer.Serialize(result, _jsonOptions);
     }
 
@@ -79,7 +121,7 @@ public class TestTools
     }
 
     [McpServerTool(Name = "test_stats", ReadOnly = true)]
-    [Description("Get the passed, failed, skipped and not-run test counts from Test Explorer. Returns counts only - Visual Studio exposes no public API for the names of the individual failed or not-run tests.")]
+    [Description("Get the aggregate passed, failed, skipped and not-run counts from Test Explorer. Use test_list for individual states and test_results for failure details.")]
     public async Task<string> GetTestStatsAsync()
     {
         var stats = await _rpcClient.GetTestStatsAsync();

@@ -79,6 +79,13 @@ public interface IVisualStudioService
     Task<bool> RunAllTestsAsync();
     Task<bool> DebugAllTestsAsync();
     Task<TestTargetResult> RunTestsInContextAsync(string target, bool debug);
+    Task<TestExplorerTestListResult> GetTestExplorerTestsAsync(string? filter, string? state, int maxResults);
+    Task<TestExplorerTestResultsResult> GetTestExplorerResultsAsync(
+        IReadOnlyCollection<string>? testIds,
+        string? filter,
+        bool failedOnly,
+        int maxResults);
+    Task<TestExplorerSelectionResult> RunSelectedTestsAsync(IReadOnlyCollection<string> testIds, bool debug);
     Task<bool> CancelTestRunAsync();
     Task<TestRunStatus> GetTestRunStatusAsync();
     Task<TestStats> GetTestStatsAsync();
