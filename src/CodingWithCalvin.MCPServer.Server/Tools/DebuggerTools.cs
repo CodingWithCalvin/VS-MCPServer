@@ -20,7 +20,7 @@ public class DebuggerTools
     }
 
     [McpServerTool(Name = "debugger_status", ReadOnly = true)]
-    [Description("Get the current debugger state. Returns the mode (Design = not debugging, Run = executing, Break = paused at breakpoint/step), break reason, current source location (file, line, function), and debugged process name. Always succeeds regardless of debugger state.")]
+    [Description("Get the current debugger state. Returns the mode (Design = not debugging, Run = executing, Break = paused at breakpoint/step), break reason, current source location (file, line, function), and debugged process name. In Break mode after a breakpoint or step, ElapsedMillisecondsSinceLastBreak is the Visual Studio PerfTips execution time since the previous breakpoint/step (or debug start); otherwise it is null. Always succeeds regardless of debugger state.")]
     public async Task<string> GetDebuggerStatusAsync()
     {
         var status = await _rpcClient.GetDebuggerStatusAsync();

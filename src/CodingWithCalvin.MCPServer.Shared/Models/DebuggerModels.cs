@@ -9,6 +9,7 @@ public class DebuggerStatus
     public string CurrentFile { get; set; } = string.Empty;
     public int CurrentLine { get; set; }
     public string CurrentFunction { get; set; } = string.Empty;
+    public long? ElapsedMillisecondsSinceLastBreak { get; set; }
 }
 
 public enum BreakpointConditionType

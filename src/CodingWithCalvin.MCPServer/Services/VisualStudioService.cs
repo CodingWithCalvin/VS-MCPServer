@@ -1503,6 +1503,17 @@ public class VisualStudioService : IVisualStudioService
             VsixTelemetry.TrackException(ex);
         }
 
+        if (debugger.CurrentMode == dbgDebugMode.dbgBreakMode &&
+            (debugger.LastBreakReason == dbgEventReason.dbgEventReasonBreakpoint ||
+             debugger.LastBreakReason == dbgEventReason.dbgEventReasonStep))
+        {
+            var performanceCounters = MCPServerPackage.DebuggerPerformanceCounters;
+            if (performanceCounters != null)
+            {
+                status.ElapsedMillisecondsSinceLastBreak = await performanceCounters.GetElapsedMillisecondsAsync();
+            }
+        }
+
         return status;
     }
 
