@@ -1513,12 +1513,32 @@ public class VisualStudioService : IVisualStudioService
 
         try
         {
-            if (dte.Solution?.SolutionBuild?.StartupProjects is Array startupProjects && startupProjects.Length > 0)
+            if (dte.Solution?.SolutionBuild?.StartupProjects is not Array startupProjects
+                || startupProjects.Length == 0)
             {
-                return startupProjects.GetValue(0) as string;
+                return null;
             }
 
-            return null;
+            if (startupProjects.GetValue(0) is not string uniqueName || string.IsNullOrEmpty(uniqueName))
+            {
+                return null;
+            }
+
+            // SolutionBuild stores the UniqueName, while project_list and the launch tools use the
+            // display name. Translate it so the value can be passed straight back to either tool.
+            if (dte.Solution.Projects != null)
+            {
+                foreach (EnvDTE.Project project in dte.Solution.Projects)
+                {
+                    var match = FindProjectByUniqueName(project, uniqueName);
+                    if (match != null)
+                    {
+                        return match.Name;
+                    }
+                }
+            }
+
+            return uniqueName;
         }
         catch (Exception ex)
         {
@@ -1536,8 +1556,20 @@ public class VisualStudioService : IVisualStudioService
 
         try
         {
-            dte.Solution.SolutionBuild.StartupProjects = projectName;
-            return true;
+            // SolutionBuild.StartupProjects only accepts a UniqueName. Resolve the display name that
+            // project_list exposes, and keep accepting a UniqueName for callers that already have one.
+            var targetProject = FindProject(dte.Solution, projectName);
+            if (targetProject == null)
+            {
+                return false;
+            }
+
+            var uniqueName = targetProject.UniqueName;
+            dte.Solution.SolutionBuild.StartupProjects = uniqueName;
+
+            // An unresolvable value is ignored without raising an error, so read the saved value back.
+            var saved = (dte.Solution.SolutionBuild.StartupProjects as Array)?.GetValue(0) as string;
+            return string.Equals(saved, uniqueName, StringComparison.OrdinalIgnoreCase);
         }
         catch (Exception ex)
         {
@@ -1547,7 +1579,7 @@ public class VisualStudioService : IVisualStudioService
         }
     }
 
-    public async Task<bool> DebugLaunchProjectAsync(string projectName, bool noDebug)
+    public async Task<LaunchProjectResult> DebugLaunchProjectAsync(string projectName, bool noDebug)
     {
         using var activity = VsixTelemetry.Tracer.StartActivity("DebugLaunchProject");
 
@@ -1556,67 +1588,51 @@ public class VisualStudioService : IVisualStudioService
 
         try
         {
-            EnvDTE.Project? targetProject = null;
-
-            foreach (EnvDTE.Project project in dte.Solution.Projects)
+            if (dte.Solution == null)
             {
-                targetProject = FindProjectByName(project, projectName);
-                if (targetProject != null)
-                {
-                    break;
-                }
+                return new LaunchProjectResult { Message = "No solution is open." };
             }
 
+            var targetProject = FindProject(dte.Solution, projectName);
             if (targetProject == null)
             {
-                return false;
+                return new LaunchProjectResult
+                {
+                    Message = $"No project named '{projectName}' is in the open solution. "
+                        + "Use project_list to see the available names."
+                };
             }
 
-            var solution = ServiceProvider.GetService(typeof(SVsSolution)) as IVsSolution;
-            if (solution == null)
+            if (dte.Debugger.CurrentMode != dbgDebugMode.dbgDesignMode)
             {
-                return false;
+                return new LaunchProjectResult
+                {
+                    Message = "The debugger is already active. Stop the current debugging session first."
+                };
             }
 
-            ErrorHandler.ThrowOnFailure(
-                solution.GetProjectOfUniqueName(targetProject.UniqueName, out var hierarchy));
+            // SDK-style projects do not implement IVsDebuggableProjectCfg, so a project cannot be
+            // launched directly. The launch goes through the solution's startup project, which is
+            // set to the requested project and left set (the command resolves it asynchronously).
+            dte.Solution.SolutionBuild.StartupProjects = targetProject.UniqueName;
 
-            if (hierarchy is not IVsGetCfgProvider getCfgProvider)
+            var savedStartup = (dte.Solution.SolutionBuild.StartupProjects as Array)?.GetValue(0) as string;
+            if (!string.Equals(savedStartup, targetProject.UniqueName, StringComparison.OrdinalIgnoreCase))
             {
-                return false;
+                return new LaunchProjectResult
+                {
+                    Message = $"Failed to make '{targetProject.Name}' the startup project."
+                };
             }
 
-            ErrorHandler.ThrowOnFailure(getCfgProvider.GetCfgProvider(out var cfgProvider));
-
-            if (cfgProvider is not IVsCfgProvider2 cfgProvider2)
-            {
-                return false;
-            }
-
-            var configName = targetProject.ConfigurationManager.ActiveConfiguration.ConfigurationName;
-            var platformName = targetProject.ConfigurationManager.ActiveConfiguration.PlatformName;
-
-            ErrorHandler.ThrowOnFailure(
-                cfgProvider2.GetCfgOfName(configName, platformName, out var cfg));
-
-            if (cfg is not IVsDebuggableProjectCfg debuggableProjectCfg)
-            {
-                return false;
-            }
-
-            var launchFlags = noDebug
-                ? (uint)__VSDBGLAUNCHFLAGS.DBGLAUNCH_NoDebug
-                : 0u;
-
-            ErrorHandler.ThrowOnFailure(debuggableProjectCfg.DebugLaunch(launchFlags));
-
-            return true;
+            dte.ExecuteCommand(noDebug ? "Debug.StartWithoutDebugging" : "Debug.Start");
+            return new LaunchProjectResult { Started = true };
         }
         catch (Exception ex)
         {
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.RecordException(ex);
-            return false;
+            return new LaunchProjectResult { Message = ex.Message };
         }
     }
 
@@ -1647,6 +1663,79 @@ public class VisualStudioService : IVisualStudioService
             }
 
             return string.Equals(project.Name, name, StringComparison.OrdinalIgnoreCase)
+                ? project
+                : null;
+        }
+        catch (Exception ex)
+        {
+            VsixTelemetry.TrackException(ex);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Finds a project by display name first and by UniqueName second, so callers can pass the value
+    /// that <see cref="GetStartupProjectAsync"/> returned as well as the name project_list shows.
+    /// </summary>
+    private static EnvDTE.Project? FindProject(EnvDTE.Solution? solution, string name)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        if (solution?.Projects == null)
+        {
+            return null;
+        }
+
+        foreach (EnvDTE.Project project in solution.Projects)
+        {
+            var match = FindProjectByName(project, name);
+            if (match != null)
+            {
+                return match;
+            }
+        }
+
+        foreach (EnvDTE.Project project in solution.Projects)
+        {
+            var match = FindProjectByUniqueName(project, name);
+            if (match != null)
+            {
+                return match;
+            }
+        }
+
+        return null;
+    }
+
+    private static EnvDTE.Project? FindProjectByUniqueName(EnvDTE.Project project, string uniqueName)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        try
+        {
+            if (project.Kind == ProjectKinds.vsProjectKindSolutionFolder)
+            {
+                if (project.ProjectItems != null)
+                {
+                    foreach (ProjectItem item in project.ProjectItems)
+                    {
+                        if (item.SubProject == null)
+                        {
+                            continue;
+                        }
+
+                        var found = FindProjectByUniqueName(item.SubProject, uniqueName);
+                        if (found != null)
+                        {
+                            return found;
+                        }
+                    }
+                }
+
+                return null;
+            }
+
+            return string.Equals(project.UniqueName, uniqueName, StringComparison.OrdinalIgnoreCase)
                 ? project
                 : null;
         }

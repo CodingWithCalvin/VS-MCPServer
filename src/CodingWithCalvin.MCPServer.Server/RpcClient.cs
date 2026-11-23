@@ -146,7 +146,7 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
     public Task<string?> GetStartupProjectAsync() => Proxy.GetStartupProjectAsync();
     public Task<bool> SetStartupProjectAsync(string projectName) => Proxy.SetStartupProjectAsync(projectName);
     public Task<bool> DebugLaunchAsync() => Proxy.DebugLaunchAsync();
-    public Task<bool> DebugLaunchProjectAsync(string projectName, bool noDebug) => Proxy.DebugLaunchProjectAsync(projectName, noDebug);
+    public Task<LaunchProjectResult> DebugLaunchProjectAsync(string projectName, bool noDebug) => Proxy.DebugLaunchProjectAsync(projectName, noDebug);
     public Task<bool> DebugLaunchWithoutDebuggingAsync() => Proxy.DebugLaunchWithoutDebuggingAsync();
     public Task<bool> DebugContinueAsync() => Proxy.DebugContinueAsync();
     public Task<bool> DebugBreakAsync() => Proxy.DebugBreakAsync();

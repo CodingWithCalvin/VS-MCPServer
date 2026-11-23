@@ -65,3 +65,17 @@ public class CallStackFrameInfo
     public string Language { get; set; } = string.Empty;
     public string ReturnType { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// Outcome of asking the debugger to launch one specific project.
+/// </summary>
+public class LaunchProjectResult
+{
+    public bool Started { get; set; }
+
+    /// <summary>
+    /// Why the launch did not start. Null when <see cref="Started"/> is true.
+    /// </summary>
+    public string? Message { get; set; }
+}
+

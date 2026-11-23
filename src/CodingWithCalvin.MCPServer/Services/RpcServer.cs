@@ -255,7 +255,7 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
     public Task<string?> GetStartupProjectAsync() => _vsService.GetStartupProjectAsync();
     public Task<bool> SetStartupProjectAsync(string projectName) => _vsService.SetStartupProjectAsync(projectName);
     public Task<bool> DebugLaunchAsync() => _vsService.DebugLaunchAsync();
-    public Task<bool> DebugLaunchProjectAsync(string projectName, bool noDebug) => _vsService.DebugLaunchProjectAsync(projectName, noDebug);
+    public Task<LaunchProjectResult> DebugLaunchProjectAsync(string projectName, bool noDebug) => _vsService.DebugLaunchProjectAsync(projectName, noDebug);
     public Task<bool> DebugLaunchWithoutDebuggingAsync() => _vsService.DebugLaunchWithoutDebuggingAsync();
     public Task<bool> DebugContinueAsync() => _vsService.DebugContinueAsync();
     public Task<bool> DebugBreakAsync() => _vsService.DebugBreakAsync();
