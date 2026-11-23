@@ -93,6 +93,14 @@ internal sealed class DialogAutomation
         return result;
     }
 
+    /// <summary>
+    /// Answers whether Visual Studio is waiting on a modal dialog. Applies the same rules as
+    /// <see cref="GetDialogsAsync"/> but stops at window enumeration: nothing is read through UI
+    /// Automation and no message is sent to any window, so it stays cheap enough for the return
+    /// path of every tool call.
+    /// </summary>
+    internal bool HasBlockingDialogs() => FindBlockingDialogs().Count > 0;
+
     internal async Task<DialogResponseResult> RespondAsync(string button, string? dialogId)
     {
         var result = new DialogResponseResult { Button = button };

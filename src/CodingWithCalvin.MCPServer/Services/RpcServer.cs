@@ -315,5 +315,6 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
     public Task<DialogListResult> GetDialogsAsync() => _vsService.GetDialogsAsync();
     public Task<DialogResponseResult> RespondToDialogAsync(string button, string? dialogId)
         => _vsService.RespondToDialogAsync(button, dialogId);
+    public Task<bool> HasBlockingDialogsAsync() => _vsService.HasBlockingDialogsAsync();
 }
 

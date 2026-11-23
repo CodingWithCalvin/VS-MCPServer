@@ -103,5 +103,6 @@ public interface IVisualStudioService
     // Dialog tools
     Task<DialogListResult> GetDialogsAsync();
     Task<DialogResponseResult> RespondToDialogAsync(string button, string? dialogId);
+    Task<bool> HasBlockingDialogsAsync();
 }
 
