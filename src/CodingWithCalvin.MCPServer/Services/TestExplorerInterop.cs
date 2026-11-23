@@ -527,6 +527,10 @@ internal sealed class TestExplorerInterop
             State = state,
             IsRunning = state is "Discovering" or "Running" or "Canceling",
             LastOperation = lastOperation,
+            Comment = lastOperation == "ChangeDetectionStarting" &&
+                state is "NoRunObserved" or "Completed" or "Canceled"
+                    ? "Build or change detection is in progress; test execution has not started."
+                    : null,
             Stats = GetStats()
         };
     }

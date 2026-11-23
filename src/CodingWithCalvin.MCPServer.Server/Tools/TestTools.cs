@@ -113,7 +113,7 @@ public class TestTools
     }
 
     [McpServerTool(Name = "test_status", ReadOnly = true)]
-    [Description("Get the Test Explorer run state plus current counts. State is one of 'NoRunObserved', 'Discovering', 'Running', 'Canceling', 'Completed', or 'Canceled'. Use this to poll for completion after test_run_all, test_run, or their debug equivalents. State is only tracked for runs started after this extension first contacted Test Explorer.")]
+    [Description("Get the Test Explorer run state plus current counts. State is one of 'NoRunObserved', 'Discovering', 'Running', 'Canceling', 'Completed', or 'Canceled'. An optional Comment explains transitional phases such as build or change detection before execution; during such a phase Stats may be stale. Use this to poll for completion after test_run_all, test_run, or their debug equivalents. State is only tracked for runs started after this extension first contacted Test Explorer.")]
     public async Task<string> GetTestStatusAsync()
     {
         var status = await _rpcClient.GetTestRunStatusAsync();

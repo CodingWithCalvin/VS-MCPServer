@@ -4,6 +4,7 @@ using System.ComponentModel.Composition;
 using System.ComponentModel.Composition.Hosting;
 using System.ComponentModel.Composition.Primitives;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using CodingWithCalvin.MCPServer.Services;
@@ -167,6 +168,38 @@ public class TestExplorerInteropTests
         Assert.Equal("NoRunObserved", status.State);
         Assert.False(status.IsRunning);
         Assert.Null(status.LastOperation);
+        Assert.Null(status.Comment);
+    }
+
+    [Fact]
+    public async Task GetRunStatus_ExplainsChangeDetectionWithoutTreatingItAsExecution()
+    {
+        using var host = new StubHost();
+        var interop = new TestExplorerInterop(host.Accessor);
+        interop.EnsureTracking();
+
+        host.Operations.Raise(TestOperationStates.ChangeDetectionStarting);
+        var initial = await interop.GetRunStatusAsync();
+
+        host.Operations.Raise(TestOperationStates.DiscoveryStarted);
+        var discovery = await interop.GetRunStatusAsync();
+
+        host.Operations.Raise(TestOperationStates.TestExecutionFinished);
+        host.Operations.Raise(TestOperationStates.ChangeDetectionStarting);
+        var completed = await interop.GetRunStatusAsync();
+
+        const string expected = "Build or change detection is in progress; test execution has not started.";
+        Assert.Equal("NoRunObserved", initial.State);
+        Assert.False(initial.IsRunning);
+        Assert.Equal(expected, initial.Comment);
+
+        Assert.Equal("Discovering", discovery.State);
+        Assert.Null(discovery.Comment);
+        Assert.DoesNotContain("\"Comment\"", JsonSerializer.Serialize(discovery));
+
+        Assert.Equal("Completed", completed.State);
+        Assert.False(completed.IsRunning);
+        Assert.Equal(expected, completed.Comment);
     }
 
     [Fact]

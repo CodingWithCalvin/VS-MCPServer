@@ -44,7 +44,10 @@ public enum TestOperationStates
     TestExecutionStarted = 0x00020001,
     TestExecutionCanceling = 0x00020003,
     TestExecutionFinished = 0x00020004,
-    TestExecutionCancelAndFinished = 0x00020006
+    TestExecutionCancelAndFinished = 0x00020006,
+    ChangeDetection = 0x00040000,
+    ChangeDetectionFinished = 0x00040004,
+    ChangeDetectionStarting = 0x00040008
 }
 
 public class OperationStateChangedEventArgs : EventArgs
