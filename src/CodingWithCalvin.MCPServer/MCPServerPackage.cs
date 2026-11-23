@@ -37,6 +37,7 @@ public sealed class MCPServerPackage : AsyncPackage
     public static IServerProcessManager? ServerManager { get; private set; }
     public static IRpcServer? RpcServer { get; private set; }
     public static IVisualStudioService? VsService { get; private set; }
+    internal static DebuggerPerformanceCounterService? DebuggerPerformanceCounters { get; private set; }
     public static IOutputPaneService? OutputPaneService { get; private set; }
     public static SettingsDialogPage? Settings { get; private set; }
 
@@ -100,6 +101,20 @@ public sealed class MCPServerPackage : AsyncPackage
             ServerManager = _componentModel.GetService<IServerProcessManager>();
             OutputPaneService = _componentModel.GetService<IOutputPaneService>();
         }
+
+        if (VsService != null && DebuggerPerformanceCounters == null)
+        {
+            try
+            {
+                var performanceCounters = new DebuggerPerformanceCounterService(this);
+                performanceCounters.Initialize();
+                DebuggerPerformanceCounters = performanceCounters;
+            }
+            catch (Exception ex)
+            {
+                VsixTelemetry.TrackException(ex);
+            }
+        }
     }
 
     /// <summary>
@@ -120,6 +135,16 @@ public sealed class MCPServerPackage : AsyncPackage
     {
         if (disposing)
         {
+            try
+            {
+                DebuggerPerformanceCounters?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"MCPServer: error disposing debugger performance counters: {ex}");
+            }
+            DebuggerPerformanceCounters = null;
+
             var serverManager = ServerManager;
 
             if (serverManager != null)
