@@ -262,6 +262,7 @@ public class DialogAutomationTests
         var automation = new DialogAutomation();
 
         Assert.Empty((await automation.GetDialogsAsync()).Dialogs);
+        Assert.False(automation.HasBlockingDialogs());
 
         var response = await automation.RespondAsync("OK", dialogId: null);
 
@@ -290,6 +291,7 @@ public class DialogAutomationTests
 
         var dialog = await WaitForDialogAsync(automation, host, Title);
 
+        Assert.True(automation.HasBlockingDialogs());
         Assert.Null(dialog.Note);
         Assert.Equal("The source code is different from the original version.", dialog.Message);
         Assert.Equal(new[] { "Yes", "No", "Cancel" }, dialog.Buttons.Select(b => b.Name).ToArray());
@@ -307,6 +309,7 @@ public class DialogAutomationTests
         Assert.Equal("No", response.Button);
         Assert.True(response.DialogClosed, response.Message);
         Assert.DoesNotContain(response.OpenDialogs, open => open.Id == dialog.Id);
+        Assert.False(automation.HasBlockingDialogs());
         Assert.Equal(Forms.DialogResult.No, host.WaitForResult());
     }
 
@@ -362,6 +365,8 @@ public class DialogAutomationTests
 
         var listed = await WaitForDialogAsync(automation, host, Title);
 
+        Assert.True(automation.HasBlockingDialogs());
+
         // A WPF button also exposes its caption as a Text child; it must not leak into the message.
         Assert.Equal("Hot Reload changes not supported.", listed.Message);
         Assert.Equal(
@@ -411,6 +416,8 @@ public class DialogAutomationTests
 
             var listed = await WaitForDialogAsync(automation, host, Title);
 
+            // Detection is Win32-only, so it answers even while the dialog's thread is blocked.
+            Assert.True(automation.HasBlockingDialogs());
             Assert.Equal(Title, listed.Title);
             Assert.True(
                 stopwatch.Elapsed < AppearTimeout + DialogAutomation.ReadTimeout,

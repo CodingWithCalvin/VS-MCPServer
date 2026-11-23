@@ -105,7 +105,20 @@ static async Task RunServerAsync(string pipeName, string host, int port, string 
     .WithTools<TestTools>()
     .WithTools<TerminalTools>()
     .WithTools<CoverageTools>()
-    .WithTools<DialogTools>();
+    .WithTools<DialogTools>()
+    .AddCallToolFilter(next => async (context, cancellationToken) =>
+    {
+        var result = await next(context, cancellationToken).ConfigureAwait(false);
+
+        // Every tool except dialog_list and dialog_respond reaches its own return point here;
+        // only then is Visual Studio checked for a dialog that is still blocking it.
+        if (!BlockingDialogWarning.IsExempt(context.Params?.Name))
+        {
+            result = await BlockingDialogWarning.ApplyAsync(result, rpcClient).ConfigureAwait(false);
+        }
+
+        return result;
+    });
 
     var app = builder.Build();
 

@@ -3439,6 +3439,13 @@ public class VisualStudioService : IVisualStudioService
         }
     }
 
+    /// <remarks>
+    /// Called after every tool call to decide whether its output needs a warning, so unlike the
+    /// methods above this stays a bare Win32 enumeration: no telemetry activity, no UI Automation
+    /// and never the UI thread.
+    /// </remarks>
+    public Task<bool> HasBlockingDialogsAsync() => Task.FromResult(Dialogs.HasBlockingDialogs());
+
     /// <summary>
     /// ExecuteCommand throws when a command is disabled or unknown, which for Test Explorer is
     /// the normal state before discovery finishes. Probing first keeps that an ordinary result

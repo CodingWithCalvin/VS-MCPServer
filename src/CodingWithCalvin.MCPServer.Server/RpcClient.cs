@@ -206,4 +206,5 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
     public Task<DialogListResult> GetDialogsAsync() => Proxy.GetDialogsAsync();
     public Task<DialogResponseResult> RespondToDialogAsync(string button, string? dialogId)
         => Proxy.RespondToDialogAsync(button, dialogId);
+    public Task<bool> HasBlockingDialogsAsync() => Proxy.HasBlockingDialogsAsync();
 }
