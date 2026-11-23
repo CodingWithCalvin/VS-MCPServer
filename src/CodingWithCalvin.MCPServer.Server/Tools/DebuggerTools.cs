@@ -28,16 +28,20 @@ public class DebuggerTools
     }
 
     [McpServerTool(Name = "debugger_launch", Destructive = false)]
-    [Description("Start debugging a project (equivalent to F5). If projectName is specified, launches that specific project without changing the startup project. Otherwise debugs the current startup project. A solution must be open. Use debugger_status to check the resulting state.")]
+    [Description("Start debugging a project (equivalent to F5). If projectName is specified, that project becomes the startup project and is launched; the startup project stays changed. Otherwise debugs the current startup project. A solution must be open. Use debugger_status to check the resulting state.")]
     public async Task<string> DebugLaunchAsync(
-        [Description("Optional: The display name of the project to debug (e.g., 'MyProject'). Launches this project directly without changing the startup project. Use project_list to see available project names.")] string? projectName = null)
+        [Description("Optional: The display name of the project to debug (e.g., 'MyProject'). Sets it as the startup project and launches it. Use project_list to see available project names.")] string? projectName = null)
     {
         if (projectName != null)
         {
-            var success = await _rpcClient.DebugLaunchProjectAsync(projectName, noDebug: false);
-            return success
-                ? $"Debugging started for project: {projectName}"
-                : $"Failed to start debugging for project '{projectName}'. Use project_list to verify the project name.";
+            var result = await _rpcClient.DebugLaunchProjectAsync(projectName, noDebug: false);
+            if (result.Started)
+            {
+                return $"Debugging started for project: {projectName} (now the startup project)";
+            }
+
+            var reason = string.IsNullOrEmpty(result.Message) ? string.Empty : " " + result.Message;
+            return $"Failed to start debugging for project '{projectName}'.{reason}";
         }
         else
         {
@@ -47,16 +51,20 @@ public class DebuggerTools
     }
 
     [McpServerTool(Name = "debugger_launch_without_debugging", Destructive = false)]
-    [Description("Start a project without the debugger attached (equivalent to Ctrl+F5). If projectName is specified, launches that specific project without changing the startup project. Otherwise runs the current startup project. The application runs normally without breakpoints or stepping. A solution must be open.")]
+    [Description("Start a project without the debugger attached (equivalent to Ctrl+F5). If projectName is specified, that project becomes the startup project and is launched; the startup project stays changed. Otherwise runs the current startup project. The application runs normally without breakpoints or stepping. A solution must be open.")]
     public async Task<string> DebugLaunchWithoutDebuggingAsync(
-        [Description("Optional: The display name of the project to run (e.g., 'MyProject'). Launches this project directly without changing the startup project. Use project_list to see available project names.")] string? projectName = null)
+        [Description("Optional: The display name of the project to run (e.g., 'MyProject'). Sets it as the startup project and launches it. Use project_list to see available project names.")] string? projectName = null)
     {
         if (projectName != null)
         {
-            var success = await _rpcClient.DebugLaunchProjectAsync(projectName, noDebug: true);
-            return success
-                ? $"Started without debugging for project: {projectName}"
-                : $"Failed to start without debugging for project '{projectName}'. Use project_list to verify the project name.";
+            var result = await _rpcClient.DebugLaunchProjectAsync(projectName, noDebug: true);
+            if (result.Started)
+            {
+                return $"Started without debugging for project: {projectName} (now the startup project)";
+            }
+
+            var reason = string.IsNullOrEmpty(result.Message) ? string.Empty : " " + result.Message;
+            return $"Failed to start without debugging for project '{projectName}'.{reason}";
         }
         else
         {

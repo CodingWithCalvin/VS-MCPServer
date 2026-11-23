@@ -50,7 +50,7 @@ public interface IVisualStudioRpc
     Task<string?> GetStartupProjectAsync();
     Task<bool> SetStartupProjectAsync(string projectName);
     Task<bool> DebugLaunchAsync();
-    Task<bool> DebugLaunchProjectAsync(string projectName, bool noDebug);
+    Task<LaunchProjectResult> DebugLaunchProjectAsync(string projectName, bool noDebug);
     Task<bool> DebugLaunchWithoutDebuggingAsync();
     Task<bool> DebugContinueAsync();
     Task<bool> DebugBreakAsync();
