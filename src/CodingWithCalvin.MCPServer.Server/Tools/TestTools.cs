@@ -91,7 +91,7 @@ public class TestTools
     }
 
     [McpServerTool(Name = "test_results", ReadOnly = true)]
-    [Description("Get structured Test Explorer results, including failed test messages, stack traces, standard output/error, duration, and attachments. By default returns failed results only; use testIds or filter to narrow the results.")]
+    [Description("Get structured Test Explorer results from the most recent test run, including failed test messages, stack traces, standard output/error, duration, and attachments. By default returns failed results only; use testIds or filter to narrow the results.")]
     public async Task<string> GetTestExplorerResultsAsync(
         [Description("Optional Test Explorer IDs returned by test_list.")] List<string>? testIds = null,
         [Description("Optional case-insensitive substring filter over test name or display name.")] string? filter = null,

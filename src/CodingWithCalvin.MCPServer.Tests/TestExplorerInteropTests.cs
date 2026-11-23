@@ -111,6 +111,38 @@ public class TestExplorerInteropTests
         Assert.Equal("test output", failure.StandardOutput);
     }
 
+    [Fact]
+    public async Task GetResultsAsync_ReturnsOnlyNewestRun()
+    {
+        using var host = new StubHost();
+        var test = Test("CalculatorTests.Add", "CalculatorTests.Add", TestState.Passed);
+        test.Results.Add(new StubResult { State = TestState.Passed, RunId = 3, ReceivedOrder = 10 });
+        test.Results.Add(new StubResult { State = TestState.Failed, RunId = 4, ReceivedOrder = 20 });
+        host.Tests.Tests.Add(test);
+
+        var result = await new TestExplorerInterop(host.Accessor).GetResultsAsync(null, null, false, 10);
+
+        var newest = Assert.Single(result.Results);
+        Assert.Equal(4, newest.RunId);
+        Assert.Equal("Failed", newest.State);
+    }
+
+    [Fact]
+    public async Task GetResultsAsync_IgnoresFailuresFromEarlierRuns()
+    {
+        using var host = new StubHost();
+        var test = Test("CalculatorTests.Add", "CalculatorTests.Add", TestState.Passed);
+        test.Results.Add(new StubResult { State = TestState.Failed, RunId = 7, ReceivedOrder = 10 });
+        test.Results.Add(new StubResult { State = TestState.Passed, RunId = 8, ReceivedOrder = 20 });
+        host.Tests.Tests.Add(test);
+
+        var result = await new TestExplorerInterop(host.Accessor).GetResultsAsync(null, null, true, 10);
+
+        // The newest run passed, so a failure kept from an older run must not surface.
+        Assert.Empty(result.Results);
+        Assert.Equal(0, result.TotalCount);
+    }
+
     [Theory]
     [InlineData(false, "Run")]
     [InlineData(true, "Debug")]
