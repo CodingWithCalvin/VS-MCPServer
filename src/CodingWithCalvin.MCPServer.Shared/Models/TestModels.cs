@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace CodingWithCalvin.MCPServer.Shared.Models;
 
 /// <summary>
@@ -39,13 +37,6 @@ public class TestRunStatus
     /// Null until a state change has been observed.
     /// </summary>
     public string? LastOperation { get; set; }
-
-    /// <summary>
-    /// Explains a transitional state that <see cref="State"/> and <see cref="IsRunning"/>
-    /// cannot describe on their own. Omitted when no additional explanation is needed.
-    /// </summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Comment { get; set; }
 
     public TestStats Stats { get; set; } = new();
 }

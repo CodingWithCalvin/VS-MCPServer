@@ -91,7 +91,7 @@ public class TestTools
     }
 
     [McpServerTool(Name = "test_results", ReadOnly = true)]
-    [Description("Get structured Test Explorer results from the most recent test run, including failed test messages, stack traces, standard output/error, duration, and attachments. By default returns failed results only; use testIds or filter to narrow the results.")]
+    [Description("Get structured Test Explorer results, including failed test messages, stack traces, standard output/error, duration, and attachments. By default returns failed results only; use testIds or filter to narrow the results.")]
     public async Task<string> GetTestExplorerResultsAsync(
         [Description("Optional Test Explorer IDs returned by test_list.")] List<string>? testIds = null,
         [Description("Optional case-insensitive substring filter over test name or display name.")] string? filter = null,
@@ -113,7 +113,7 @@ public class TestTools
     }
 
     [McpServerTool(Name = "test_status", ReadOnly = true)]
-    [Description("Get the Test Explorer run state plus current counts. State is one of 'NoRunObserved', 'Discovering', 'Running', 'Canceling', 'Completed', or 'Canceled'. An optional Comment explains transitional phases such as build or change detection before execution; during such a phase Stats may be stale. Use this to poll for completion after test_run_all, test_run, or their debug equivalents. State is only tracked for runs started after this extension first contacted Test Explorer.")]
+    [Description("Get the Test Explorer run state plus current counts. State is one of 'NoRunObserved', 'Discovering', 'Running', 'Canceling', 'Completed', or 'Canceled'. NoRunObserved does not necessarily mean that no test operation has started; build or change detection may still be in progress, and Stats may be stale during that phase. Use this to poll for completion after test_run_all, test_run, or their debug equivalents. State is only tracked for runs started after this extension first contacted Test Explorer.")]
     public async Task<string> GetTestStatusAsync()
     {
         var status = await _rpcClient.GetTestRunStatusAsync();

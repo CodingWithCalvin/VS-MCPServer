@@ -126,20 +126,9 @@ internal sealed class TestExplorerInterop
             }
 
             var tests = await ReadTestsAsync().ConfigureAwait(false);
-            var storedResults = tests
-                .Select(test => ReadTestResults(test, ids, filter))
+            var results = tests
+                .Select(test => ReadTestResults(test, ids, filter, failedOnly))
                 .SelectMany(testResults => testResults)
-                .ToList();
-
-            // Test Explorer can keep results from earlier runs. Report only the newest run so a
-            // stale failure cannot be mistaken for the state of the run the caller just started.
-            var latestRunId = storedResults.Count == 0
-                ? 0
-                : storedResults.Max(result => result.Info.RunId);
-            var results = storedResults
-                .Where(result => result.Info.RunId == latestRunId)
-                .Where(result => !failedOnly
-                    || string.Equals(result.Info.State, "Failed", StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(result => result.ReceivedOrder)
                 .ToList();
             var limit = NormalizeResultLimit(maxResults);
@@ -356,7 +345,8 @@ internal sealed class TestExplorerInterop
     private static IEnumerable<(long ReceivedOrder, TestExplorerTestResultInfo Info)> ReadTestResults(
         object test,
         HashSet<Guid>? ids,
-        string? filter)
+        string? filter,
+        bool failedOnly)
     {
         var testInfo = ReadTestInfo(test);
         if (ids != null
@@ -395,6 +385,7 @@ internal sealed class TestExplorerInterop
                     }
                 };
             })
+            .Where(result => !failedOnly || string.Equals(result.State, "Failed", StringComparison.OrdinalIgnoreCase))
             .Select(result => (result.ReceivedOrder, result.Info));
     }
 
@@ -536,10 +527,6 @@ internal sealed class TestExplorerInterop
             State = state,
             IsRunning = state is "Discovering" or "Running" or "Canceling",
             LastOperation = lastOperation,
-            Comment = lastOperation == "ChangeDetectionStarting" &&
-                state is "NoRunObserved" or "Completed" or "Canceled"
-                    ? "Build or change detection is in progress; test execution has not started."
-                    : null,
             Stats = GetStats()
         };
     }

@@ -4,7 +4,6 @@ using System.ComponentModel.Composition;
 using System.ComponentModel.Composition.Hosting;
 using System.ComponentModel.Composition.Primitives;
 using System.Linq;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using CodingWithCalvin.MCPServer.Services;
@@ -112,35 +111,67 @@ public class TestExplorerInteropTests
     }
 
     [Fact]
-    public async Task GetResultsAsync_ReturnsOnlyNewestRun()
+    public async Task GetResultsAsync_FailedOnlyFiltersResultsWhenRunIdsAreZero()
     {
         using var host = new StubHost();
-        var test = Test("CalculatorTests.Add", "CalculatorTests.Add", TestState.Passed);
-        test.Results.Add(new StubResult { State = TestState.Passed, RunId = 3, ReceivedOrder = 10 });
-        test.Results.Add(new StubResult { State = TestState.Failed, RunId = 4, ReceivedOrder = 20 });
+        var test = Test("CalculatorTests.Add", "CalculatorTests.Add", TestState.Failed);
+        test.Results.Add(new StubResult { State = TestState.Passed, ReceivedOrder = 30 });
+        test.Results.Add(new StubResult { State = TestState.Failed, ReceivedOrder = 20 });
+        test.Results.Add(new StubResult { State = TestState.Skipped, ReceivedOrder = 10 });
         host.Tests.Tests.Add(test);
+        var interop = new TestExplorerInterop(host.Accessor);
 
-        var result = await new TestExplorerInterop(host.Accessor).GetResultsAsync(null, null, false, 10);
+        var failures = await interop.GetResultsAsync(null, null, true, 10);
+        var all = await interop.GetResultsAsync(null, null, false, 10);
 
-        var newest = Assert.Single(result.Results);
-        Assert.Equal(4, newest.RunId);
-        Assert.Equal("Failed", newest.State);
+        Assert.Equal("Failed", Assert.Single(failures.Results).State);
+        Assert.Equal(1, failures.TotalCount);
+        Assert.Equal(3, all.TotalCount);
+        Assert.Equal(3, all.Results.Count);
+        Assert.All(all.Results, result => Assert.Equal(0, result.RunId));
     }
 
     [Fact]
-    public async Task GetResultsAsync_IgnoresFailuresFromEarlierRuns()
+    public async Task GetResultsAsync_DoesNotUseRunIdToDropFailures()
     {
         using var host = new StubHost();
-        var test = Test("CalculatorTests.Add", "CalculatorTests.Add", TestState.Passed);
+        var test = Test("CalculatorTests.Add", "CalculatorTests.Add", TestState.Failed);
         test.Results.Add(new StubResult { State = TestState.Failed, RunId = 7, ReceivedOrder = 10 });
-        test.Results.Add(new StubResult { State = TestState.Passed, RunId = 8, ReceivedOrder = 20 });
+        test.Results.Add(new StubResult { State = TestState.Failed, RunId = 8, ReceivedOrder = 20 });
         host.Tests.Tests.Add(test);
 
         var result = await new TestExplorerInterop(host.Accessor).GetResultsAsync(null, null, true, 10);
 
-        // The newest run passed, so a failure kept from an older run must not surface.
-        Assert.Empty(result.Results);
-        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(new[] { 8, 7 }, result.Results.Select(item => item.RunId).ToArray());
+        Assert.All(result.Results, item => Assert.Equal("Failed", item.State));
+    }
+
+    [Fact]
+    public async Task GetResultsAsync_PaginatesAfterFailedOnlyFilter()
+    {
+        using var host = new StubHost();
+        var test = Test("CalculatorTests.Add", "CalculatorTests.Add", TestState.Failed);
+        test.Results.Add(new StubResult { State = TestState.Passed, ReceivedOrder = 30 });
+        test.Results.Add(new StubResult
+        {
+            State = TestState.Failed,
+            ReceivedOrder = 20,
+            ErrorMessage = "newest failure"
+        });
+        test.Results.Add(new StubResult
+        {
+            State = TestState.Failed,
+            ReceivedOrder = 10,
+            ErrorMessage = "older failure"
+        });
+        host.Tests.Tests.Add(test);
+
+        var result = await new TestExplorerInterop(host.Accessor).GetResultsAsync(null, null, true, 1);
+
+        Assert.Equal(2, result.TotalCount);
+        Assert.True(result.Truncated);
+        Assert.Equal("newest failure", Assert.Single(result.Results).ErrorMessage);
     }
 
     [Theory]
@@ -200,38 +231,6 @@ public class TestExplorerInteropTests
         Assert.Equal("NoRunObserved", status.State);
         Assert.False(status.IsRunning);
         Assert.Null(status.LastOperation);
-        Assert.Null(status.Comment);
-    }
-
-    [Fact]
-    public async Task GetRunStatus_ExplainsChangeDetectionWithoutTreatingItAsExecution()
-    {
-        using var host = new StubHost();
-        var interop = new TestExplorerInterop(host.Accessor);
-        interop.EnsureTracking();
-
-        host.Operations.Raise(TestOperationStates.ChangeDetectionStarting);
-        var initial = await interop.GetRunStatusAsync();
-
-        host.Operations.Raise(TestOperationStates.DiscoveryStarted);
-        var discovery = await interop.GetRunStatusAsync();
-
-        host.Operations.Raise(TestOperationStates.TestExecutionFinished);
-        host.Operations.Raise(TestOperationStates.ChangeDetectionStarting);
-        var completed = await interop.GetRunStatusAsync();
-
-        const string expected = "Build or change detection is in progress; test execution has not started.";
-        Assert.Equal("NoRunObserved", initial.State);
-        Assert.False(initial.IsRunning);
-        Assert.Equal(expected, initial.Comment);
-
-        Assert.Equal("Discovering", discovery.State);
-        Assert.Null(discovery.Comment);
-        Assert.DoesNotContain("\"Comment\"", JsonSerializer.Serialize(discovery));
-
-        Assert.Equal("Completed", completed.State);
-        Assert.False(completed.IsRunning);
-        Assert.Equal(expected, completed.Comment);
     }
 
     [Fact]
