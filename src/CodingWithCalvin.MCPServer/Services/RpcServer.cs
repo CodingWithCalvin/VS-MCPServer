@@ -294,6 +294,8 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
     public Task<bool> CancelTestRunAsync() => _vsService.CancelTestRunAsync();
     public Task<TestRunStatus> GetTestRunStatusAsync() => _vsService.GetTestRunStatusAsync();
     public Task<TestStats> GetTestStatsAsync() => _vsService.GetTestStatsAsync();
+    public Task<TestResultsReport> GetTestResultsAsync(TestResultsQuery query)
+        => _vsService.GetTestResultsAsync(query);
 
     public Task<CoverageRunResult> AnalyzeCodeCoverageAsync() => _vsService.AnalyzeCodeCoverageAsync();
     public Task<bool> ShowCoverageResultsAsync() => _vsService.ShowCoverageResultsAsync();
