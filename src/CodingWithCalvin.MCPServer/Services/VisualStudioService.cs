@@ -3129,6 +3129,23 @@ public class VisualStudioService : IVisualStudioService
         return TestExplorer.GetStats();
     }
 
+    private TestResultsInterop? _testResults;
+
+    private TestResultsInterop TestResults =>
+        _testResults ??= new TestResultsInterop(
+            () => ServiceProvider.GetService(typeof(SComponentModel)) as IComponentModel);
+
+    public async Task<TestResultsReport> GetTestResultsAsync(TestResultsQuery query)
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("GetTestResults");
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+        var report = await TestResults.GetResultsAsync(query);
+        report.State = TestExplorer.GetRunStatus().State;
+
+        return report;
+    }
+
     private const string AnalyzeCoverageCommand = "Test.AnalyzeCodeCoverageForAllTests";
     private const string CoverageResultsCommand = "Test.CodeCoverageResults";
 

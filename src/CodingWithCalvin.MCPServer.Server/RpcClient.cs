@@ -185,6 +185,8 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
     public Task<bool> CancelTestRunAsync() => Proxy.CancelTestRunAsync();
     public Task<TestRunStatus> GetTestRunStatusAsync() => Proxy.GetTestRunStatusAsync();
     public Task<TestStats> GetTestStatsAsync() => Proxy.GetTestStatsAsync();
+    public Task<TestResultsReport> GetTestResultsAsync(TestResultsQuery query)
+        => Proxy.GetTestResultsAsync(query);
 
     public Task<CoverageRunResult> AnalyzeCodeCoverageAsync() => Proxy.AnalyzeCodeCoverageAsync();
     public Task<bool> ShowCoverageResultsAsync() => Proxy.ShowCoverageResultsAsync();

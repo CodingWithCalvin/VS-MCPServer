@@ -1,6 +1,9 @@
+using System;
 using System.ComponentModel;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using CodingWithCalvin.MCPServer.Shared.Models;
 using ModelContextProtocol.Server;
 
 namespace CodingWithCalvin.MCPServer.Server.Tools;
@@ -12,6 +15,8 @@ public class TestTools
         "Test Explorer has not been initialized in this Visual Studio session, so no counts are "
         + "available. Open Test Explorer (window_show with 'TestExplorer') or start a run first. "
         + "Note this is not the same as the solution having no tests.";
+
+    private static readonly string[] Outcomes = { "failed", "notrun", "skipped", "passed", "all" };
 
     private readonly RpcClient _rpcClient;
     private readonly JsonSerializerOptions _jsonOptions;
@@ -79,7 +84,7 @@ public class TestTools
     }
 
     [McpServerTool(Name = "test_stats", ReadOnly = true)]
-    [Description("Get the passed, failed, skipped and not-run test counts from Test Explorer. Returns counts only - Visual Studio exposes no public API for the names of the individual failed or not-run tests.")]
+    [Description("Get the passed, failed, skipped and not-run test counts from Test Explorer. Returns counts only; use test_results for the individual tests, with failure messages, stack traces, files and lines.")]
     public async Task<string> GetTestStatsAsync()
     {
         var stats = await _rpcClient.GetTestStatsAsync();
@@ -89,5 +94,33 @@ public class TestTools
         }
 
         return JsonSerializer.Serialize(stats, _jsonOptions);
+    }
+
+    [McpServerTool(Name = "test_results", ReadOnly = true)]
+    [Description("Get the individual tests from Test Explorer with their outcome, file and line, and per result the error message and stack trace. Defaults to failed tests only. Data rows of a data-driven test are usually separate entries that share FullyQualifiedName, with the row's arguments in DisplayName; Results can also hold one result per row. LineNumber is where the test method starts; the failing line is in ErrorStackTrace. State is the run state as in test_status, so results read while a run is still going can be told apart. Stale is true when a result is out of date: the code has changed since it ran, or it was restored from an earlier Visual Studio session. Error messages, stack traces and output are cut to 4,000 characters each, flagged by Truncated on the result. TotalMatched counts every test that passed the filters; the top-level Truncated is true when that is more than maxResults. When Available is false, Message says why, and that does not mean there are no failed tests.")]
+    public async Task<string> GetTestResultsAsync(
+        [Description("Which tests to return: failed, notrun, skipped, passed, or all. Defaults to failed. Case-insensitive.")]
+        string outcome = "failed",
+        [Description("Substring of the fully qualified test name, such as a class or namespace. Case-insensitive.")]
+        string? filter = null,
+        [Description("Maximum number of tests to return. Defaults to 50.")]
+        int maxResults = 50,
+        [Description("Include each result's standard output and standard error. Defaults to false.")]
+        bool includeOutput = false)
+    {
+        if (!Outcomes.Contains(outcome, StringComparer.OrdinalIgnoreCase))
+        {
+            return $"Invalid outcome '{outcome}'. Valid values are: {string.Join(", ", Outcomes)}.";
+        }
+
+        var report = await _rpcClient.GetTestResultsAsync(new TestResultsQuery
+        {
+            Outcome = outcome,
+            Filter = string.IsNullOrWhiteSpace(filter) ? null : filter,
+            MaxResults = maxResults,
+            IncludeOutput = includeOutput
+        });
+
+        return JsonSerializer.Serialize(report, _jsonOptions);
     }
 }

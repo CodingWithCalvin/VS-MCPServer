@@ -87,6 +87,7 @@ public interface IVisualStudioRpc
     Task<bool> CancelTestRunAsync();
     Task<TestRunStatus> GetTestRunStatusAsync();
     Task<TestStats> GetTestStatsAsync();
+    Task<TestResultsReport> GetTestResultsAsync(TestResultsQuery query);
 
     // Terminal tools
     Task<TerminalResult> CreateTerminalAsync(string? name, string? workingDirectory, string? command);
