@@ -125,6 +125,7 @@ dotnet build src/CodingWithCalvin.VSMCP/CodingWithCalvin.VSMCP.csproj
 - `Services/RpcServer.cs` - Named pipe JSON-RPC server
 - `Services/ServerProcessManager.cs` - Server process lifecycle management
 - `Services/TestExplorerInterop.cs` - Reflection bridge to Test Explorer (see the file's remarks for why it cannot be a compile-time reference)
+- `Services/TestResultsInterop.cs` - Reflection bridge to the individual test results behind Test Explorer (internal types; see the file's remarks)
 - `Services/TerminalInterop.cs` - Reflection bridge to the integrated terminal, over the brokered service container
 - `Services/CoverageInterop.cs` - Reflection bridge to the code coverage file reader
 - `Services/DialogAutomation.cs` - Finds and answers modal dialogs via Win32 and UI Automation, without ever touching the UI thread the dialog is blocking
@@ -207,10 +208,13 @@ dotnet build src/CodingWithCalvin.VSMCP/CodingWithCalvin.VSMCP.csproj
 - `test_cancel` - Cancel the test run in progress
 - `test_debug` - Debug the tests in a single class or method
 - `test_debug_all` - Debug every test in the solution
+- `test_results` - Read individual test outcomes (failed by default) with error message, stack trace, file, and line
 - `test_run` - Run the tests in a single class or method
 - `test_run_all` - Run every test in the solution
 - `test_stats` - Get passed, failed, skipped, and not-run counts
 - `test_status` - Get the run state plus current counts
+
+`test_results` reads `ITestsService`, `ITest`, and `IResult`, which are internal to Test Explorer (checked on VS 18.7). They are MEF exports, so they are resolved by contract name and read through their interface types, like the stats service. A Visual Studio update can change them, so every failure reports `Available: false` with a reason rather than throwing; that must never be read as "no failed tests".
 
 ### Coverage Tools
 - `coverage_analyze` - Run all tests with code coverage collection
