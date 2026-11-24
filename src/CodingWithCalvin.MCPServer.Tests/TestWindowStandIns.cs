@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 // Stand-ins for the Test Explorer extensibility types, declared in the real namespace so that
 // their full names match the MEF contract names TestExplorerInterop looks up.
@@ -10,7 +12,8 @@ using System;
 // reflectively, and these declarations let the tests drive that path without Visual Studio.
 //
 // Shapes are transcribed from the shipped assembly and are identical in VS 2022 17.14 and
-// VS 2026 18.0. Only the members the interop touches are reproduced.
+// VS 2026 18.0. The ITestsService / ITest / IResult shapes (internal in the real assembly) were
+// transcribed from VS 2026 18.7. Only the members the interops touch are reproduced.
 namespace Microsoft.VisualStudio.TestWindow.Extensibility;
 
 public struct TestExplorerStats
@@ -52,4 +55,45 @@ public class OperationStateChangedEventArgs : EventArgs
 public interface IOperationState
 {
     event EventHandler<OperationStateChangedEventArgs> StateChanged;
+}
+
+public enum TestState
+{
+    None,
+    Failed,
+    Skipped,
+    Passed,
+    NotFound,
+    NotRun
+}
+
+public interface IResult
+{
+    string DisplayName { get; }
+    TestState State { get; }
+    TimeSpan Duration { get; }
+    string ErrorMessage { get; }
+    string ErrorStackTrace { get; }
+    string StandardOutput { get; }
+    string StandardError { get; }
+}
+
+public interface ITest
+{
+    string FullyQualifiedName { get; }
+    string DisplayName { get; }
+    string FilePath { get; }
+    string Source { get; }
+    TimeSpan Duration { get; }
+    int LineNumber { get; }
+    TestState State { get; }
+    bool Stale { get; }
+    IEnumerable<IResult> Results { get; }
+}
+
+public interface ITestsService
+{
+    bool IsTestServiceRunning { get; }
+    Task<IEnumerable<ITest>> GetTestsAsEnumerableAsync();
+    Task<IEnumerable<ITest>> GetTestsAsEnumerableAsync(IEnumerable<Guid> testIds);
 }
