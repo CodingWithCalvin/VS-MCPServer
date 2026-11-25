@@ -1118,17 +1118,17 @@ public class VisualStudioService : IVisualStudioService
                     CollectCodeElements(codeModel.CodeElements, search, item.FileNames[1], string.Empty);
                 }
 
-                if (item.ProjectItems != null && item.ProjectItems.Count > 0)
-                {
-                    CollectProjectSymbols(item.ProjectItems, search);
-                }
+				if (item.ProjectItems != null && item.ProjectItems.Count > 0)
+				{
+					CollectProjectSymbols(item.ProjectItems, search);
+				}
 
 				if (item.ContainingProject.Kind == ProjectKinds.vsProjectKindSolutionFolder && item.SubProject != null)
 				{
 					CollectProjectSymbols(item.SubProject.ProjectItems, search);
 				}
-            }
-            catch (Exception ex)
+			}
+			catch (Exception ex)
             {
                 VsixTelemetry.TrackException(ex);
             }
@@ -2938,21 +2938,84 @@ public class VisualStudioService : IVisualStudioService
         "TestExplorer.CancelTests"
     };
 
+    /// <summary>
+    /// Commands that create and activate the Test Explorer tool window. The first one the
+    /// running Visual Studio recognises is used; <c>View.TestExplorer</c> is canonical but some
+    /// builds also expose <c>TestExplorer.ShowTestExplorer</c>.
+    /// </summary>
+    private static readonly string[] ShowTestExplorerCommands =
+    {
+        "View.TestExplorer",
+        "TestExplorer.ShowTestExplorer"
+    };
+
     private TestExplorerInterop? _testExplorer;
 
     private TestExplorerInterop TestExplorer =>
         _testExplorer ??= new TestExplorerInterop(
             () => ServiceProvider.GetService(typeof(SComponentModel)) as IComponentModel);
 
+    /// <summary>
+    /// Test Explorer's MEF services are registered at startup but stay not-running until its tool
+    /// window is created, so a fresh Visual Studio launch reports "not initialized" until someone
+    /// opens Test Explorer. Run/debug tools create the window proactively — the same action as
+    /// View → Test Explorer — and wait briefly for the service to start, instead of requiring a
+    /// manual foreground click. Safe to call repeatedly: once the service is running this is a
+    /// fast no-op.
+    /// </summary>
+    private async Task EnsureTestExplorerInitializedAsync()
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+        if (TestExplorer.IsTestServiceRunning())
+        {
+            return;
+        }
+
+        using var activity = VsixTelemetry.Tracer.StartActivity("EnsureTestExplorerInitialized");
+        var dte = await GetDteAsync();
+
+        foreach (var command in ShowTestExplorerCommands)
+        {
+            try
+            {
+                dte.ExecuteCommand(command);
+                break;
+            }
+            catch (Exception ex)
+            {
+                // The command may be disabled or named differently on this Visual Studio build;
+                // try the next candidate and let the poll below catch a window already opening.
+                VsixTelemetry.TrackException(ex);
+            }
+        }
+
+        // The service flips to running once the TestWindow host starts; discovery then continues
+        // in the background. Give it a bounded moment to come up before giving up.
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            if (TestExplorer.IsTestServiceRunning())
+            {
+                return;
+            }
+
+            await Task.Delay(500);
+        }
+
+        activity?.SetStatus(ActivityStatusCode.Error, "Test Explorer did not become ready in time.");
+    }
+
     public async Task<bool> RunAllTestsAsync()
     {
         using var activity = VsixTelemetry.Tracer.StartActivity("RunAllTests");
+        await EnsureTestExplorerInitializedAsync();
         return await StartTestRunAsync("TestExplorer.RunAllTests", activity);
     }
 
     public async Task<bool> DebugAllTestsAsync()
     {
         using var activity = VsixTelemetry.Tracer.StartActivity("DebugAllTests");
+        await EnsureTestExplorerInitializedAsync();
         return await StartTestRunAsync("TestExplorer.DebugAllTests", activity);
     }
 
@@ -2994,81 +3057,51 @@ public class VisualStudioService : IVisualStudioService
         }
 
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-        var dte = await GetDteAsync();
-
+        await EnsureTestExplorerInitializedAsync();
         try
         {
-            var search = await SearchWorkspaceSymbolsAsync(target.Trim());
-            var candidates = search.Symbols
-                .Where(s => s.Kind == SymbolKind.Class || s.Kind == SymbolKind.Function)
-                .ToList();
-
-            var symbol = SelectTestTarget(candidates, target.Trim());
-            if (symbol == null)
+            var testList = await TestExplorer.GetTestsAsync(target.Trim(), null, 1000);
+            if (!testList.Available)
             {
                 return new TestTargetResult
                 {
-                    Message = $"No class or method named '{target}' was found in the solution."
+                    Message = testList.Message ?? "Test Explorer test discovery is unavailable."
                 };
             }
 
-            // The *InContext commands act on wherever the caret currently is, so the target has
-            // to be opened and the caret placed on it before the command is issued.
-            if (!await OpenDocumentAsync(symbol.FilePath))
+            var matches = TestExplorerInterop.FindTestsForTarget(testList.Tests, target.Trim());
+            if (matches.Count == 0)
             {
                 return new TestTargetResult
                 {
-                    ResolvedTarget = symbol.FullName,
-                    FilePath = symbol.FilePath,
-                    Line = symbol.StartLine,
-                    Message = $"Could not open '{symbol.FilePath}' to position the caret."
+                    Message = $"No discovered Test Explorer tests match '{target}'. Use test_list to inspect discovered test IDs."
                 };
             }
 
-            if (!await SetSelectionAsync(
-                    symbol.FilePath,
-                    symbol.StartLine,
-                    symbol.StartColumn,
-                    symbol.StartLine,
-                    symbol.StartColumn))
+            var isClassTarget = matches.All(test =>
+                test.FullyQualifiedName.StartsWith(target.Trim() + ".", StringComparison.OrdinalIgnoreCase)
+                || test.FullyQualifiedName.IndexOf("." + target.Trim() + ".", StringComparison.OrdinalIgnoreCase) >= 0);
+            if (matches.Count > 1 && !isClassTarget)
             {
                 return new TestTargetResult
                 {
-                    ResolvedTarget = symbol.FullName,
-                    FilePath = symbol.FilePath,
-                    Line = symbol.StartLine,
-                    Message = $"Could not position the caret on '{symbol.FullName}'."
+                    Message = $"'{target}' matches multiple tests. Use test_list and run the selected test IDs, or provide a fully qualified name."
                 };
             }
-
-            var command = debug
-                ? "TestExplorer.DebugAllTestsInContext"
-                : "TestExplorer.RunAllTestsInContext";
 
             TestExplorer.EnsureTracking();
-
-            if (!IsCommandAvailable(dte, command))
-            {
-                return new TestTargetResult
-                {
-                    ResolvedTarget = symbol.FullName,
-                    FilePath = symbol.FilePath,
-                    Line = symbol.StartLine,
-                    Message = $"'{command}' is unavailable. Test Explorer may still be discovering tests."
-                };
-            }
-
-            dte.ExecuteCommand(command);
+            var operation = await TestExplorer.RunTestsAsync(
+                matches.Select(test => test.Id).ToList(),
+                debug);
+            var selected = matches[0];
 
             return new TestTargetResult
             {
-                Started = true,
-                ResolvedTarget = symbol.FullName,
-                FilePath = symbol.FilePath,
-                Line = symbol.StartLine,
-                Message = candidates.Count > 1
-                    ? $"{candidates.Count} symbols matched '{target}'; used '{symbol.FullName}'."
-                    : null
+                Started = operation.Started,
+                ResolvedTarget = matches.Count == 1 ? selected.FullyQualifiedName : target.Trim(),
+                FilePath = selected.FilePath,
+                Line = selected.LineNumber,
+                Message = operation.Message
             };
         }
         catch (Exception ex)
@@ -3079,16 +3112,33 @@ public class VisualStudioService : IVisualStudioService
         }
     }
 
-    /// <summary>
-    /// Picks the best match for a caller-supplied class or method name, preferring an exact
-    /// fully qualified match over an exact simple name over a trailing-segment match.
-    /// </summary>
-    internal static SymbolInfo? SelectTestTarget(IReadOnlyList<SymbolInfo> candidates, string target)
+    public async Task<TestExplorerTestListResult> GetTestExplorerTestsAsync(
+        string? filter,
+        string? state,
+        int maxResults)
     {
-        return candidates.FirstOrDefault(s => string.Equals(s.FullName, target, StringComparison.Ordinal))
-            ?? candidates.FirstOrDefault(s => string.Equals(s.Name, target, StringComparison.Ordinal))
-            ?? candidates.FirstOrDefault(s => s.FullName.EndsWith("." + target, StringComparison.Ordinal))
-            ?? candidates.FirstOrDefault();
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        return await TestExplorer.GetTestsAsync(filter, state, maxResults);
+    }
+
+    public async Task<TestExplorerTestResultsResult> GetTestExplorerResultsAsync(
+        IReadOnlyCollection<string>? testIds,
+        string? filter,
+        bool failedOnly,
+        int maxResults)
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        return await TestExplorer.GetResultsAsync(testIds, filter, failedOnly, maxResults);
+    }
+
+    public async Task<TestExplorerSelectionResult> RunSelectedTestsAsync(
+        IReadOnlyCollection<string> testIds,
+        bool debug)
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        await EnsureTestExplorerInitializedAsync();
+        TestExplorer.EnsureTracking();
+        return await TestExplorer.RunTestsAsync(testIds, debug);
     }
 
     public async Task<bool> CancelTestRunAsync()
@@ -3120,7 +3170,7 @@ public class VisualStudioService : IVisualStudioService
     public async Task<TestRunStatus> GetTestRunStatusAsync()
     {
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-        return TestExplorer.GetRunStatus();
+        return await TestExplorer.GetRunStatusAsync();
     }
 
     public async Task<TestStats> GetTestStatsAsync()

@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 // Stand-ins for the Test Explorer extensibility types, declared in the real namespace so that
 // their full names match the MEF contract names TestExplorerInterop looks up.
@@ -52,4 +55,96 @@ public class OperationStateChangedEventArgs : EventArgs
 public interface IOperationState
 {
     event EventHandler<OperationStateChangedEventArgs> StateChanged;
+}
+
+public enum TestState
+{
+    None,
+    Failed,
+    Skipped,
+    Passed,
+    NotFound,
+    NotRun
+}
+
+public interface IResult
+{
+    string DisplayName { get; }
+    short RunId { get; }
+    long ReceivedOrder { get; }
+    short Outcome { get; }
+    TestState State { get; }
+    string? ErrorStackTrace { get; }
+    string? ErrorMessage { get; }
+    TimeSpan Duration { get; }
+    string? StandardOutput { get; }
+    string? StandardError { get; }
+    string? AttachmentsString { get; }
+}
+
+public interface ITest
+{
+    Guid Id { get; }
+    string FullyQualifiedName { get; }
+    string DisplayName { get; }
+    TestState State { get; }
+    bool Stale { get; }
+    bool IsCurrentlyRunning { get; }
+    string? FilePath { get; }
+    int LineNumber { get; }
+    string Source { get; }
+    IEnumerable<IResult> Results { get; }
+}
+
+public interface ITestsService
+{
+    Task<IEnumerable<ITest>> GetTestsAsEnumerableAsync();
+    Task<IEnumerable<ITest>> GetTestsAsEnumerableAsync(IEnumerable<Guid> testIds);
+    bool IsTestServiceRunning { get; }
+    event EventHandler TestServiceStarted;
+    Task<bool> RunTestsAsync(IEnumerable<Guid> tests);
+    Task<bool> DebugTestsAsync(IEnumerable<Guid> tests);
+}
+
+public enum TestPropertyType
+{
+    FullyQualifiedName = 6,
+    TestCaseId = 9,
+    TestCaseRecordId = 10
+}
+
+public enum FilterMatchKind
+{
+    ExactMatch = 2
+}
+
+public sealed class TestQuery
+{
+    internal TestQuery(
+        TestPropertyType propertyType,
+        IEnumerable<string> values,
+        FilterMatchKind matchKind)
+    {
+        PropertyType = propertyType;
+        Values = values;
+        MatchKind = matchKind;
+    }
+
+    public TestPropertyType PropertyType { get; }
+    public IEnumerable<string> Values { get; }
+    public FilterMatchKind MatchKind { get; }
+}
+
+public interface ITestNode
+{
+}
+
+public interface IVsTestService
+{
+    bool IsServiceAvailable { get; }
+    event EventHandler OnReady;
+    event EventHandler OnInactive;
+    Task<IEnumerable<ITestNode>> GetTestsAsync(TestQuery query, CancellationToken cancellationToken);
+    Task<bool> RunTestsAsync(TestQuery query, CancellationToken cancellationToken);
+    Task<bool> DebugTestsAsync(TestQuery query, CancellationToken cancellationToken);
 }

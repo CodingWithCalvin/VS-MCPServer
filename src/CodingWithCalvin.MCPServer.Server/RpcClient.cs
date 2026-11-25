@@ -182,6 +182,19 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
     public Task<bool> DebugAllTestsAsync() => Proxy.DebugAllTestsAsync();
     public Task<TestTargetResult> RunTestsInContextAsync(string target, bool debug)
         => Proxy.RunTestsInContextAsync(target, debug);
+    public Task<TestExplorerTestListResult> GetTestExplorerTestsAsync(
+        string? filter,
+        string? state,
+        int maxResults = 200)
+        => Proxy.GetTestExplorerTestsAsync(filter, state, maxResults);
+    public Task<TestExplorerTestResultsResult> GetTestExplorerResultsAsync(
+        List<string>? testIds,
+        string? filter,
+        bool failedOnly = true,
+        int maxResults = 100)
+        => Proxy.GetTestExplorerResultsAsync(testIds, filter, failedOnly, maxResults);
+    public Task<TestExplorerSelectionResult> RunSelectedTestsAsync(List<string> testIds, bool debug)
+        => Proxy.RunSelectedTestsAsync(testIds, debug);
     public Task<bool> CancelTestRunAsync() => Proxy.CancelTestRunAsync();
     public Task<TestRunStatus> GetTestRunStatusAsync() => Proxy.GetTestRunStatusAsync();
     public Task<TestStats> GetTestStatsAsync() => Proxy.GetTestStatsAsync();
