@@ -191,8 +191,10 @@ public class RpcClient : IVisualStudioRpc, IServerRpc, IDisposable
     public Task<CoverageReportResult> GetCoverageReportAsync(string? coverageFile, string? detail, string? filter)
         => Proxy.GetCoverageReportAsync(coverageFile, detail, filter);
 
-    public Task<TerminalResult> CreateTerminalAsync(string? name, string? workingDirectory, string? command)
-        => Proxy.CreateTerminalAsync(name, workingDirectory, command);
+    public Task<TerminalResult> CreateTerminalAsync(string? name, string? workingDirectory)
+        => Proxy.CreateTerminalAsync(name, workingDirectory);
+    public Task<TerminalResult> RunInTerminalAsync(string? terminalId, string? name, string? workingDirectory, string command, int waitMilliseconds)
+        => Proxy.RunInTerminalAsync(terminalId, name, workingDirectory, command, waitMilliseconds);
     public Task<TerminalListResult> GetTerminalsAsync() => Proxy.GetTerminalsAsync();
     public Task<bool> ShowTerminalAsync(string terminalId) => Proxy.ShowTerminalAsync(terminalId);
     public Task<bool> CloseTerminalAsync(string terminalId) => Proxy.CloseTerminalAsync(terminalId);

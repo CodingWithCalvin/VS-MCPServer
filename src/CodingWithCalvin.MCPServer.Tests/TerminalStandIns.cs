@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.ServiceHub.Framework;
@@ -12,31 +13,56 @@ using Microsoft.ServiceHub.Framework;
 // loads it by strong name and reads these types reflectively. Supplying the test assembly as the
 // assembly resolver lets that whole path run without Visual Studio.
 //
-// Shapes are transcribed from the shipped assembly and are identical in VS 2022 17.14 and
-// VS 2026 18.0. Only the members the interop touches are reproduced - including both
-// CreateTerminalAsync overloads that differ solely by the trailing working-directory parameter,
-// so the overload selection is genuinely exercised.
+// ITerminalService and ITerminalProfile have the required members in both VS 2022 17.14 and
+// VS 2026 18.0. TerminalServiceDescriptors represents the VS 2022 broker path, while
+// SVsTerminalService and IVsTerminalService represent the VS 2026 direct-service path. Tests
+// hide the other version's types to exercise each path independently.
 namespace Microsoft.VisualStudio.Terminal;
 
-public class ProfileConfig
+public interface ITerminalProfile
 {
+    string? DisplayName { get; }
+    string? Location { get; }
+    string? Arguments { get; }
+}
+
+public class ProfileConfig : ITerminalProfile
+{
+    public ProfileConfig(string displayName, string location, string? arguments = null, bool isDefault = false)
+    {
+        DisplayName = displayName;
+        Location = location;
+        Arguments = arguments;
+        IsDefault = isDefault;
+    }
+
     public string? Id { get; set; }
     public string? DisplayName { get; set; }
     public string? Location { get; set; }
     public string? Arguments { get; set; }
     public bool IsDefault { get; set; }
-    public bool CreatePTY { get; set; }
+    public bool CreatePTY => true;
+}
+
+public class TerminalWindowOptions
+{
+    public string? Name { get; set; }
+    public ITerminalProfile? Profile { get; set; }
+    public string? WorkingDirectory { get; set; }
 }
 
 public interface ITerminalService
 {
-    Task<Guid> CreateTerminalAsync(CancellationToken cancellationToken, string? name, ProfileConfig? profile);
+    Task<Guid> CreateTerminalWindowAsync(CancellationToken cancellationToken, TerminalWindowOptions options);
 
     Task<Guid> CreateTerminalAsync(
         CancellationToken cancellationToken,
         string? name,
-        ProfileConfig? profile,
-        string? workingDirectory);
+        ITerminalProfile? profile);
+
+    Task<ITerminalProfile> GetDefaultProfileAsync(CancellationToken cancellationToken);
+
+    Task AttachTerminalStreamAsync(Guid terminalGuid, Stream stream, CancellationToken cancellationToken);
 
     Task<IEnumerable<Guid>> GetTerminalGuidsAsync(CancellationToken cancellationToken);
 
@@ -45,6 +71,15 @@ public interface ITerminalService
     Task CloseAsync(Guid terminalGuid, CancellationToken cancellationToken);
 
     Task CloseAllInstancesAsync(CancellationToken cancellationToken);
+}
+
+public sealed class SVsTerminalService
+{
+}
+
+public interface IVsTerminalService
+{
+    ITerminalService CreateTerminalService();
 }
 
 public static class TerminalServiceDescriptors

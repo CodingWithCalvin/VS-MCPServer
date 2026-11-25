@@ -157,6 +157,15 @@ public sealed class MCPServerPackage : AsyncPackage
                 System.Diagnostics.Debug.WriteLine($"MCPServer: error disposing RPC server: {ex}");
             }
 
+            try
+            {
+                (VsService as IDisposable)?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"MCPServer: error disposing Visual Studio services: {ex}");
+            }
+
             VsixTelemetry.Shutdown();
 
             ServerManager = null;

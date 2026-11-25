@@ -10,26 +10,41 @@ public class TerminalResult
     public bool Created { get; set; }
 
     /// <summary>
-    /// Identifier for the new terminal, used by the show and close tools.
+    /// True when the command was typed into a terminal that was already open rather than into a
+    /// newly created one.
+    /// </summary>
+    public bool Reused { get; set; }
+
+    /// <summary>
+    /// Identifier for the terminal the command was submitted to, used by the show and close tools.
     /// </summary>
     public string? TerminalId { get; set; }
 
     /// <summary>
-    /// Command the terminal was launched with, when one was supplied.
+    /// Command that was submitted to the terminal, when one was supplied.
     /// </summary>
     public string? Command { get; set; }
 
     public string? WorkingDirectory { get; set; }
 
     /// <summary>
-    /// True when the command was launched inside the Visual Studio developer environment, so
-    /// that tooling such as msbuild and dotnet-coverage is on PATH.
+    /// Raw text the terminal printed while the command was being submitted, captured for the
+    /// requested wait window. It is unprocessed PTY output: it still contains ANSI escape
+    /// sequences, the echoed command and the shell prompt, and there is no exit code or
+    /// indication that the command finished.
+    /// </summary>
+    public string? Output { get; set; }
+
+    /// <summary>
+    /// True when the terminal's default profile loads the Visual Studio developer environment,
+    /// so that tooling such as msbuild and dotnet-coverage is on PATH. Unknown (false) when a
+    /// command is submitted to a terminal that was opened by someone else.
     /// </summary>
     public bool DeveloperEnvironment { get; set; }
 
     /// <summary>
-    /// Populated when <see cref="Created"/> is false, or to carry a caveat about a terminal
-    /// that was created successfully.
+    /// Populated when the command could not be submitted, or to carry a caveat about a
+    /// successful call.
     /// </summary>
     public string? Message { get; set; }
 }
