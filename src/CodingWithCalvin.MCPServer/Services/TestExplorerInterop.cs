@@ -447,6 +447,28 @@ internal sealed class TestExplorerInterop
             : exception.Message;
 
     /// <summary>
+    /// True once the Test Explorer test service has started. The MEF export is registered as
+    /// soon as Visual Studio loads the TestWindow package, but it only reports running after the
+    /// Test Explorer tool window is created; until then every read degrades to "unavailable".
+    /// Used to decide whether a run/debug tool needs to open the window first.
+    /// </summary>
+    internal bool IsTestServiceRunning()
+    {
+        try
+        {
+            var service = ResolveTestsService(out var contract);
+            return service != null
+                && contract != null
+                && contract.GetProperty("IsTestServiceRunning")?.GetValue(service) is true;
+        }
+        catch (Exception ex)
+        {
+            VsixTelemetry.TrackException(ex);
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Reads the current Test Explorer counts. Returns <see cref="TestStats.Available"/> false
     /// when Test Explorer has not been initialized, so that an uninitialized window is not
     /// reported as a solution with zero tests.

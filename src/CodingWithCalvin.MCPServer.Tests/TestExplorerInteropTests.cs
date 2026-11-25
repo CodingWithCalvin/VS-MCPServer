@@ -73,6 +73,24 @@ public class TestExplorerInteropTests
     }
 
     [Fact]
+    public void IsTestServiceRunning_FalseWhenComponentModelMissing()
+    {
+        Assert.False(new TestExplorerInterop(() => null).IsTestServiceRunning());
+    }
+
+    [Fact]
+    public void IsTestServiceRunning_ReflectsServiceState()
+    {
+        using var host = new StubHost();
+
+        host.Tests.IsTestServiceRunning = true;
+        Assert.True(new TestExplorerInterop(host.Accessor).IsTestServiceRunning());
+
+        host.Tests.IsTestServiceRunning = false;
+        Assert.False(new TestExplorerInterop(host.Accessor).IsTestServiceRunning());
+    }
+
+    [Fact]
     public async Task GetTestsAsync_MapsAndFiltersDiscoveredTests()
     {
         using var host = new StubHost();
@@ -490,7 +508,7 @@ public class TestExplorerInteropTests
         internal List<Guid> LastTestIds { get; private set; } = new List<Guid>();
         internal string? LastOperation { get; private set; }
 
-        public bool IsTestServiceRunning => true;
+        public bool IsTestServiceRunning { get; set; } = true;
 
         public event EventHandler TestServiceStarted
         {

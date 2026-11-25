@@ -2938,21 +2938,84 @@ public class VisualStudioService : IVisualStudioService
         "TestExplorer.CancelTests"
     };
 
+    /// <summary>
+    /// Commands that create and activate the Test Explorer tool window. The first one the
+    /// running Visual Studio recognises is used; <c>View.TestExplorer</c> is canonical but some
+    /// builds also expose <c>TestExplorer.ShowTestExplorer</c>.
+    /// </summary>
+    private static readonly string[] ShowTestExplorerCommands =
+    {
+        "View.TestExplorer",
+        "TestExplorer.ShowTestExplorer"
+    };
+
     private TestExplorerInterop? _testExplorer;
 
     private TestExplorerInterop TestExplorer =>
         _testExplorer ??= new TestExplorerInterop(
             () => ServiceProvider.GetService(typeof(SComponentModel)) as IComponentModel);
 
+    /// <summary>
+    /// Test Explorer's MEF services are registered at startup but stay not-running until its tool
+    /// window is created, so a fresh Visual Studio launch reports "not initialized" until someone
+    /// opens Test Explorer. Run/debug tools create the window proactively — the same action as
+    /// View → Test Explorer — and wait briefly for the service to start, instead of requiring a
+    /// manual foreground click. Safe to call repeatedly: once the service is running this is a
+    /// fast no-op.
+    /// </summary>
+    private async Task EnsureTestExplorerInitializedAsync()
+    {
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+        if (TestExplorer.IsTestServiceRunning())
+        {
+            return;
+        }
+
+        using var activity = VsixTelemetry.Tracer.StartActivity("EnsureTestExplorerInitialized");
+        var dte = await GetDteAsync();
+
+        foreach (var command in ShowTestExplorerCommands)
+        {
+            try
+            {
+                dte.ExecuteCommand(command);
+                break;
+            }
+            catch (Exception ex)
+            {
+                // The command may be disabled or named differently on this Visual Studio build;
+                // try the next candidate and let the poll below catch a window already opening.
+                VsixTelemetry.TrackException(ex);
+            }
+        }
+
+        // The service flips to running once the TestWindow host starts; discovery then continues
+        // in the background. Give it a bounded moment to come up before giving up.
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            if (TestExplorer.IsTestServiceRunning())
+            {
+                return;
+            }
+
+            await Task.Delay(500);
+        }
+
+        activity?.SetStatus(ActivityStatusCode.Error, "Test Explorer did not become ready in time.");
+    }
+
     public async Task<bool> RunAllTestsAsync()
     {
         using var activity = VsixTelemetry.Tracer.StartActivity("RunAllTests");
+        await EnsureTestExplorerInitializedAsync();
         return await StartTestRunAsync("TestExplorer.RunAllTests", activity);
     }
 
     public async Task<bool> DebugAllTestsAsync()
     {
         using var activity = VsixTelemetry.Tracer.StartActivity("DebugAllTests");
+        await EnsureTestExplorerInitializedAsync();
         return await StartTestRunAsync("TestExplorer.DebugAllTests", activity);
     }
 
@@ -2994,6 +3057,7 @@ public class VisualStudioService : IVisualStudioService
         }
 
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        await EnsureTestExplorerInitializedAsync();
         try
         {
             var testList = await TestExplorer.GetTestsAsync(target.Trim(), null, 1000);
@@ -3072,6 +3136,7 @@ public class VisualStudioService : IVisualStudioService
         bool debug)
     {
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+        await EnsureTestExplorerInitializedAsync();
         TestExplorer.EnsureTracking();
         return await TestExplorer.RunTestsAsync(testIds, debug);
     }
