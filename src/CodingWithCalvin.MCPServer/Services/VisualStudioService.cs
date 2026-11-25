@@ -26,7 +26,7 @@ namespace CodingWithCalvin.MCPServer.Services;
 
 [Export(typeof(IVisualStudioService))]
 [PartCreationPolicy(CreationPolicy.Shared)]
-public class VisualStudioService : IVisualStudioService
+public class VisualStudioService : IVisualStudioService, IDisposable
 {
     private IServiceProvider? _serviceProvider;
 
@@ -3278,7 +3278,13 @@ public class VisualStudioService : IVisualStudioService
 
     private TerminalInterop? _terminal;
 
-    private TerminalInterop Terminal => _terminal ??= new TerminalInterop(GetServiceBroker);
+    private TerminalInterop Terminal => _terminal ??= new TerminalInterop(GetServiceBroker, GetVsService);
+
+    private object? GetVsService(Type serviceType)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+        return ServiceProvider.GetService(serviceType);
+    }
 
     private IServiceBroker? GetServiceBroker()
     {
@@ -3290,10 +3296,11 @@ public class VisualStudioService : IVisualStudioService
         return container?.GetFullAccessServiceBroker();
     }
 
+    public void Dispose() => _terminal?.Dispose();
+
     public async Task<TerminalResult> CreateTerminalAsync(
         string? name,
-        string? workingDirectory,
-        string? command)
+        string? workingDirectory)
     {
         using var activity = VsixTelemetry.Tracer.StartActivity("CreateTerminal");
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
@@ -3305,18 +3312,9 @@ public class VisualStudioService : IVisualStudioService
             var outcome = await Terminal.CreateTerminalAsync(
                 name,
                 resolvedDirectory,
-                command,
                 CancellationToken.None);
 
-            return new TerminalResult
-            {
-                Created = outcome.Created,
-                TerminalId = outcome.Created ? outcome.TerminalId.ToString() : null,
-                Command = command,
-                WorkingDirectory = resolvedDirectory,
-                DeveloperEnvironment = outcome.DeveloperEnvironment,
-                Message = outcome.Message
-            };
+            return ToTerminalResult(outcome, command: null, resolvedDirectory);
         }
         catch (Exception ex)
         {
@@ -3325,6 +3323,55 @@ public class VisualStudioService : IVisualStudioService
             return new TerminalResult { Message = ex.Message };
         }
     }
+
+    public async Task<TerminalResult> RunInTerminalAsync(
+        string? terminalId,
+        string? name,
+        string? workingDirectory,
+        string command)
+    {
+        using var activity = VsixTelemetry.Tracer.StartActivity("RunInTerminal");
+        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+        try
+        {
+            // A reused terminal keeps its current directory unless the caller asks for a
+            // specific one, so only resolve the solution-directory fallback for new terminals.
+            var directory = string.IsNullOrWhiteSpace(terminalId)
+                ? ResolveTerminalWorkingDirectory(workingDirectory)
+                : string.IsNullOrWhiteSpace(workingDirectory) ? null : NormalizePath(workingDirectory!);
+
+            var outcome = await Terminal.RunInTerminalAsync(
+                terminalId,
+                name,
+                directory,
+                command,
+                CancellationToken.None);
+
+            return ToTerminalResult(outcome, command, directory);
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            return new TerminalResult { Message = ex.Message };
+        }
+    }
+
+    private static TerminalResult ToTerminalResult(
+        TerminalCreateOutcome outcome,
+        string? command,
+        string? workingDirectory) =>
+        new()
+        {
+            Created = outcome.Created,
+            Reused = outcome.Reused,
+            TerminalId = outcome.Created || outcome.Reused ? outcome.TerminalId.ToString() : null,
+            Command = command,
+            WorkingDirectory = workingDirectory,
+            DeveloperEnvironment = outcome.DeveloperEnvironment,
+            Message = outcome.Message
+        };
 
     /// <summary>
     /// Falls back to the open solution's directory so that a caller who omits the working

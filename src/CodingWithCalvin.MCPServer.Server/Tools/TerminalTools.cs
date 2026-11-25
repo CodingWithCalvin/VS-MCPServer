@@ -18,28 +18,29 @@ public class TerminalTools
     }
 
     [McpServerTool(Name = "terminal_run", Destructive = true)]
-    [Description("Run a command in a new Visual Studio integrated terminal. The command is launched inside the Visual Studio developer environment, so msbuild, vstest.console and dotnet-coverage are on PATH. IMPORTANT: output is NOT returned - the Visual Studio terminal is a raw PTY with no exit code or command boundaries, so this tool reports only whether the terminal was opened. To read results, redirect the command's output to a file and then read it with document_read.")]
+    [Description("Run a command in a Visual Studio integrated terminal. Pass terminalId to type the command into a terminal that is already open, reusing its shell and state; omit it to open a new terminal first. The command is typed into the user's default terminal shell, which in VS 2026 is Developer PowerShell with the Visual Studio developer environment imported (msbuild, vstest.console and dotnet-coverage on PATH). IMPORTANT: output is NOT returned - the Visual Studio terminal is a raw PTY with no exit code or command boundaries, so this tool reports only that the command was submitted. To read results, redirect the command's output to a file and then read it with document_read.")]
     public async Task<string> RunInTerminalAsync(
         [Description("Command line to run, for example 'dotnet-coverage collect -f cobertura -o coverage.xml dotnet test'.")] string command,
-        [Description("Working directory for the command. Defaults to the directory containing the open solution.")] string? workingDirectory = null,
-        [Description("Caption for the terminal tab. Defaults to a Visual Studio generated name.")] string? name = null)
+        [Description("Working directory for the command. Defaults to the directory containing the open solution when a new terminal is created; a reused terminal keeps its current directory unless this is set.")] string? workingDirectory = null,
+        [Description("Caption for the terminal tab when a new terminal is created. Defaults to a Visual Studio generated name.")] string? name = null,
+        [Description("Identifier of an existing terminal to reuse, from terminal_run, terminal_create or terminal_list. Omit to create a new terminal.")] string? terminalId = null)
     {
         if (string.IsNullOrWhiteSpace(command))
         {
             return "A command is required.";
         }
 
-        var result = await _rpcClient.CreateTerminalAsync(name, workingDirectory, command);
+        var result = await _rpcClient.RunInTerminalAsync(terminalId, name, workingDirectory, command);
         return JsonSerializer.Serialize(result, _jsonOptions);
     }
 
     [McpServerTool(Name = "terminal_create", Destructive = false)]
-    [Description("Open a new empty Visual Studio integrated terminal using the user's default terminal profile, without running anything in it. Use terminal_run instead to launch a command.")]
+    [Description("Open a new empty Visual Studio integrated terminal using the user's default terminal profile, without running anything in it. The terminal can later receive commands through terminal_run by passing its identifier. Use terminal_run instead to launch a command immediately.")]
     public async Task<string> CreateTerminalAsync(
         [Description("Caption for the terminal tab. Defaults to a Visual Studio generated name.")] string? name = null,
         [Description("Working directory for the terminal. Defaults to the directory containing the open solution.")] string? workingDirectory = null)
     {
-        var result = await _rpcClient.CreateTerminalAsync(name, workingDirectory, command: null);
+        var result = await _rpcClient.CreateTerminalAsync(name, workingDirectory);
         return JsonSerializer.Serialize(result, _jsonOptions);
     }
 

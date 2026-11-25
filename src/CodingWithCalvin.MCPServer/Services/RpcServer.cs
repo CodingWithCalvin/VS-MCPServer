@@ -300,8 +300,10 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
     public Task<CoverageReportResult> GetCoverageReportAsync(string? coverageFile, string? detail, string? filter)
         => _vsService.GetCoverageReportAsync(coverageFile, detail, filter);
 
-    public Task<TerminalResult> CreateTerminalAsync(string? name, string? workingDirectory, string? command)
-        => _vsService.CreateTerminalAsync(name, workingDirectory, command);
+    public Task<TerminalResult> CreateTerminalAsync(string? name, string? workingDirectory)
+        => _vsService.CreateTerminalAsync(name, workingDirectory);
+    public Task<TerminalResult> RunInTerminalAsync(string? terminalId, string? name, string? workingDirectory, string command)
+        => _vsService.RunInTerminalAsync(terminalId, name, workingDirectory, command);
     public Task<TerminalListResult> GetTerminalsAsync() => _vsService.GetTerminalsAsync();
     public Task<bool> ShowTerminalAsync(string terminalId) => _vsService.ShowTerminalAsync(terminalId);
     public Task<bool> CloseTerminalAsync(string terminalId) => _vsService.CloseTerminalAsync(terminalId);

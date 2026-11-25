@@ -1,13 +1,16 @@
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using CodingWithCalvin.Otel4Vsix;
 using Microsoft.ServiceHub.Framework;
+using Nerdbank.Streams;
 
 namespace CodingWithCalvin.MCPServer.Services;
 
@@ -23,17 +26,27 @@ namespace CodingWithCalvin.MCPServer.Services;
 /// </para>
 /// <para>
 /// What cannot be referenced is <c>Microsoft.VisualStudio.Terminal.dll</c>, which supplies
-/// <c>ITerminalService</c>, <c>ProfileConfig</c> and <c>TerminalServiceDescriptors</c>. It ships
-/// only inside the Visual Studio installation, is absent from NuGet and from the
+/// <c>ITerminalService</c>, <c>ProfileConfig</c> and the version-specific service entry points.
+/// It ships only inside the Visual Studio installation, is absent from NuGet and from the
 /// Microsoft.VisualStudio.SDK metapackage, and <c>$(DevEnvDir)</c> is undefined under
 /// <c>dotnet build</c> - the same constraint documented on
-/// <see cref="TestExplorerInterop"/>. Those three types are therefore reached reflectively.
+/// <see cref="TestExplorerInterop"/>. These types are therefore reached reflectively.
 /// </para>
 /// <para>
-/// The assembly is loaded by strong name at version 17.0.0.0. Visual Studio ships a binding
-/// redirect covering 0.0.0.0 through the installed version, plus a codeBase entry pointing at
-/// CommonExtensions\Microsoft\Terminal, in both VS 2022 and VS 2026 - so one version number
-/// resolves correctly on both.
+/// VS 2022 exposes the service through <c>TerminalServiceDescriptors</c> and the brokered
+/// service container. VS 2026 removed that descriptor and instead exposes
+/// <c>SVsTerminalService</c> and <c>IVsTerminalService.CreateTerminalService()</c>.
+/// The assembly is loaded by strong name at version 17.0.0.0; both versions ship a binding
+/// redirect and codeBase entry that resolve it to the installed assembly.
+/// </para>
+/// <para>
+/// Terminals are opened with the user's default terminal profile instead of a synthetic
+/// cmd.exe /k profile. In VS 2026 that profile is Developer PowerShell, which imports the
+/// Visual Studio developer environment, so msbuild, vstest.console and dotnet-coverage are on
+/// PATH without chaining VsDevCmd.bat. A duplex stream is then attached with
+/// <c>AttachTerminalStreamAsync</c>; the terminal reads that stream as user input and mirrors
+/// its PTY output back into it. Keeping the stream open lets commands be typed into a terminal
+/// that is already running.
 /// </para>
 /// <para>
 /// Every failure path degrades to a message rather than throwing. The terminal component may be
@@ -41,91 +54,357 @@ namespace CodingWithCalvin.MCPServer.Services;
 /// call down with it.
 /// </para>
 /// </remarks>
-internal sealed class TerminalInterop
+internal sealed class TerminalInterop : IDisposable
 {
     private const string TerminalAssemblyName =
         "Microsoft.VisualStudio.Terminal, Version=17.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a";
     private const string SimpleAssemblyName = "Microsoft.VisualStudio.Terminal";
     private const string DescriptorsTypeName = "Microsoft.VisualStudio.Terminal.TerminalServiceDescriptors";
+    private const string VsServiceTypeName = "Microsoft.VisualStudio.Terminal.SVsTerminalService";
+    private const string VsServiceInterfaceTypeName = "Microsoft.VisualStudio.Terminal.IVsTerminalService";
     private const string ServiceTypeName = "Microsoft.VisualStudio.Terminal.ITerminalService";
-    private const string ProfileConfigTypeName = "Microsoft.VisualStudio.Terminal.ProfileConfig";
+    private const string ProfileTypeName = "Microsoft.VisualStudio.Terminal.ITerminalProfile";
+    private const string TerminalWindowOptionsTypeName = "Microsoft.VisualStudio.Terminal.TerminalWindowOptions";
 
     internal const string UnavailableMessage =
         "The Visual Studio integrated terminal component is unavailable in this instance.";
 
     private readonly Func<IServiceBroker?> _serviceBrokerAccessor;
     private readonly Func<Assembly?> _assemblyResolver;
+    private readonly Func<Type, object?>? _serviceAccessor;
 
-    private bool _typesResolved;
+    private Assembly? _terminalAssembly;
     private Type? _serviceType;
-    private Type? _profileConfigType;
-    private ServiceRpcDescriptor? _descriptor;
+    private object? _directService;
+    private object? _brokeredService;
 
-    internal TerminalInterop(Func<IServiceBroker?> serviceBrokerAccessor)
-        : this(serviceBrokerAccessor, TryLoadTerminalAssembly)
+    /// <summary>
+    /// Input streams attached to open terminals, keyed by terminal identifier. A terminal only
+    /// accepts typed commands while its stream is attached.
+    /// </summary>
+    private readonly ConcurrentDictionary<Guid, TerminalSession> _sessions = new();
+
+    internal TerminalInterop(
+        Func<IServiceBroker?> serviceBrokerAccessor,
+        Func<Type, object?> serviceAccessor)
+        : this(serviceBrokerAccessor, TryLoadTerminalAssembly, serviceAccessor)
     {
     }
 
     /// <summary>
-    /// Overload taking an explicit assembly resolver, so that tests can supply stand-in terminal
-    /// types without a Visual Studio installation.
+    /// Overload taking explicit resolvers, so that tests can supply stand-in terminal types and
+    /// services without a Visual Studio installation.
     /// </summary>
-    internal TerminalInterop(Func<IServiceBroker?> serviceBrokerAccessor, Func<Assembly?> assemblyResolver)
+    internal TerminalInterop(
+        Func<IServiceBroker?> serviceBrokerAccessor,
+        Func<Assembly?> assemblyResolver,
+        Func<Type, object?>? serviceAccessor = null)
     {
         _serviceBrokerAccessor = serviceBrokerAccessor;
         _assemblyResolver = assemblyResolver;
+        _serviceAccessor = serviceAccessor;
     }
 
     /// <summary>
-    /// Opens a terminal, optionally launching a command in it. When a command is supplied it is
-    /// run through cmd.exe with /k so the window stays open and its output remains readable.
+    /// Opens a terminal with the user's default profile and attaches an input stream so that
+    /// later commands can be typed into it.
     /// </summary>
     internal async Task<TerminalCreateOutcome> CreateTerminalAsync(
         string? name,
         string? workingDirectory,
-        string? command,
         CancellationToken cancellationToken)
     {
         var proxy = await AcquireProxyAsync(cancellationToken).ConfigureAwait(false);
         if (proxy == null)
         {
-            return TerminalCreateOutcome.Unavailable(UnavailableMessage);
+            return TerminalCreateOutcome.Failure(UnavailableMessage);
         }
 
         using (proxy)
         {
-            var developerEnvironment = false;
-            object? profile = null;
-
-            if (!string.IsNullOrWhiteSpace(command))
+            try
             {
-                profile = BuildCommandProfile(command!, out developerEnvironment);
-                if (profile == null)
-                {
-                    return TerminalCreateOutcome.Unavailable(UnavailableMessage);
-                }
-            }
+                var terminal = await OpenTerminalAsync(proxy, name, workingDirectory, cancellationToken)
+                    .ConfigureAwait(false);
 
-            // Four CreateTerminalAsync overloads exist; this selects the ProfileConfig one that
-            // also takes a working directory. Passing a null profile leaves Visual Studio to use
-            // the user's default terminal profile.
-            var method = _serviceType!.GetMethods()
-                .FirstOrDefault(m => m.Name == "CreateTerminalAsync" && MatchesCreateSignature(m));
-            if (method == null)
+                return terminal.Session == null
+                    ? TerminalCreateOutcome.Failure(terminal.Message ?? UnavailableMessage)
+                    : TerminalCreateOutcome.Success(terminal.TerminalId, terminal.DeveloperEnvironment);
+            }
+            catch (Exception ex)
             {
-                return TerminalCreateOutcome.Unavailable(UnavailableMessage);
+                VsixTelemetry.TrackException(ex);
+                return TerminalCreateOutcome.Failure(ex.Message);
             }
-
-            var result = await InvokeAsync(
-                method,
-                proxy.Service,
-                new[] { cancellationToken, name, profile, workingDirectory }).ConfigureAwait(false);
-
-            return result is Guid id
-                ? TerminalCreateOutcome.Success(id, developerEnvironment)
-                : TerminalCreateOutcome.Unavailable("Visual Studio did not return a terminal identifier.");
         }
     }
+
+    /// <summary>
+    /// Types <paramref name="command"/> into an existing terminal, or opens a new terminal and
+    /// types it there when <paramref name="terminalId"/> is not supplied.
+    /// </summary>
+    internal async Task<TerminalCreateOutcome> RunInTerminalAsync(
+        string? terminalId,
+        string? name,
+        string? workingDirectory,
+        string command,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            return TerminalCreateOutcome.Failure("A command is required.");
+        }
+
+        var proxy = await AcquireProxyAsync(cancellationToken).ConfigureAwait(false);
+        if (proxy == null)
+        {
+            return TerminalCreateOutcome.Failure(UnavailableMessage);
+        }
+
+        using (proxy)
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(terminalId))
+                {
+                    if (!Guid.TryParse(terminalId, out var existingId))
+                    {
+                        return TerminalCreateOutcome.Failure(
+                            $"'{terminalId}' is not a valid terminal identifier.");
+                    }
+
+                    var session = await AttachSessionAsync(proxy, existingId, cancellationToken)
+                        .ConfigureAwait(false);
+                    if (session == null)
+                    {
+                        return TerminalCreateOutcome.Failure(
+                            $"Terminal {terminalId} is not open, or it does not accept external input. "
+                            + "Use terminal_create or terminal_run to open a terminal and reuse the identifier it returns.");
+                    }
+
+                    await ShowCoreAsync(proxy, existingId, cancellationToken).ConfigureAwait(false);
+
+                    if (!string.IsNullOrWhiteSpace(workingDirectory))
+                    {
+                        await session.SendAsync(ChangeDirectory(workingDirectory!), cancellationToken)
+                            .ConfigureAwait(false);
+                    }
+
+                    await session.SendAsync(command + "\r", cancellationToken).ConfigureAwait(false);
+                    return TerminalCreateOutcome.Submitted(existingId);
+                }
+
+                var terminal = await OpenTerminalAsync(proxy, name, workingDirectory, cancellationToken)
+                    .ConfigureAwait(false);
+                if (terminal.Session == null)
+                {
+                    return TerminalCreateOutcome.Failure(terminal.Message ?? UnavailableMessage);
+                }
+
+                await terminal.Session.SendAsync(command + "\r", cancellationToken).ConfigureAwait(false);
+                return TerminalCreateOutcome.Success(terminal.TerminalId, terminal.DeveloperEnvironment);
+            }
+            catch (Exception ex)
+            {
+                VsixTelemetry.TrackException(ex);
+                return TerminalCreateOutcome.Failure(ex.Message);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Creates a terminal in the default profile, wires up its input stream, and applies the
+    /// working directory where the creation API cannot do so itself.
+    /// </summary>
+    private async Task<OpenedTerminal> OpenTerminalAsync(
+        TerminalProxy proxy,
+        string? name,
+        string? workingDirectory,
+        CancellationToken cancellationToken)
+    {
+        var profile = await GetDefaultProfileAsync(proxy.Service, cancellationToken).ConfigureAwait(false);
+        var developerEnvironment = IsDeveloperProfile(profile);
+
+        var terminalId = await CreateWindowAsync(proxy, name, workingDirectory, profile, cancellationToken)
+            .ConfigureAwait(false);
+        if (terminalId == null)
+        {
+            return OpenedTerminal.Failure("Visual Studio did not return a terminal identifier.");
+        }
+
+        var session = await AttachSessionAsync(proxy, terminalId.Value, cancellationToken).ConfigureAwait(false);
+        if (session == null)
+        {
+            // Do not leave a window behind that no caller can ever reach.
+            await CloseCoreAsync(proxy, terminalId.Value, cancellationToken).ConfigureAwait(false);
+            return OpenedTerminal.Failure("Visual Studio did not accept an input stream for the new terminal.");
+        }
+
+        // VS 2022's window overload has no working-directory argument, so change directory
+        // through the shell itself. VS 2026 stores it on the window options instead.
+        if (!proxy.UseTerminalWindowOptions && !string.IsNullOrWhiteSpace(workingDirectory))
+        {
+            await session.SendAsync(ChangeDirectory(workingDirectory!), cancellationToken).ConfigureAwait(false);
+        }
+
+        return OpenedTerminal.Success(terminalId.Value, session, developerEnvironment);
+    }
+
+    private async Task<Guid?> CreateWindowAsync(
+        TerminalProxy proxy,
+        string? name,
+        string? workingDirectory,
+        object? profile,
+        CancellationToken cancellationToken)
+    {
+        MethodInfo? method;
+        object?[] arguments;
+
+        if (proxy.UseTerminalWindowOptions)
+        {
+            var optionsType = _terminalAssembly!.GetType(TerminalWindowOptionsTypeName);
+            if (optionsType == null)
+            {
+                return null;
+            }
+
+            method = _serviceType!.GetMethod(
+                "CreateTerminalWindowAsync",
+                new[] { typeof(CancellationToken), optionsType });
+            var options = Activator.CreateInstance(optionsType);
+            if (method == null || options == null)
+            {
+                return null;
+            }
+
+            SetProperty(options, "Name", name);
+            SetProperty(options, "Profile", profile);
+            SetProperty(options, "WorkingDirectory", workingDirectory);
+            arguments = new object?[] { cancellationToken, options };
+        }
+        else
+        {
+            // Use the direct window overload rather than the renderer-based one: only a window
+            // owns the PTY in a way that accepts an attached input stream for later commands.
+            var profileType = _terminalAssembly!.GetType(ProfileTypeName);
+            method = _serviceType!.GetMethods().FirstOrDefault(m =>
+                m.Name == "CreateTerminalAsync"
+                && m.GetParameters() is { Length: 3 } parameters
+                && parameters[0].ParameterType == typeof(CancellationToken)
+                && parameters[1].ParameterType == typeof(string)
+                && profileType != null
+                && parameters[2].ParameterType == profileType);
+            arguments = new object?[] { cancellationToken, name, profile };
+        }
+
+        if (method == null)
+        {
+            return null;
+        }
+
+        var result = await InvokeAsync(method, proxy.Service, arguments).ConfigureAwait(false);
+        return result is Guid id ? id : null;
+    }
+
+    private async Task<object?> GetDefaultProfileAsync(object service, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var method = _serviceType!.GetMethod("GetDefaultProfileAsync", new[] { typeof(CancellationToken) });
+            return method == null
+                ? null
+                : await InvokeAsync(method, service, new object?[] { cancellationToken }).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // A terminal can still be opened without a profile: Visual Studio then applies its
+            // own default. Losing the profile only makes the developer-environment hint unknown.
+            VsixTelemetry.TrackException(ex);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Attaches a duplex stream to a terminal. The terminal reads what is written to the stream
+    /// as user input and copies its PTY output back into it, so the host half must stay drained
+    /// or the terminal's output pipeline stalls.
+    /// </summary>
+    private async Task<TerminalSession?> AttachSessionAsync(
+        TerminalProxy proxy,
+        Guid terminalId,
+        CancellationToken cancellationToken)
+    {
+        if (_sessions.TryGetValue(terminalId, out var existing))
+        {
+            return existing;
+        }
+
+        var method = _serviceType!.GetMethod(
+            "AttachTerminalStreamAsync",
+            new[] { typeof(Guid), typeof(Stream), typeof(CancellationToken) });
+        if (method == null)
+        {
+            return null;
+        }
+
+        var (terminalHalf, hostHalf) = FullDuplexStream.CreatePair();
+        try
+        {
+            await InvokeAsync(method, proxy.Service, new object?[] { terminalId, terminalHalf, cancellationToken })
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            VsixTelemetry.TrackException(ex);
+            terminalHalf.Dispose();
+            hostHalf.Dispose();
+            return null;
+        }
+
+        var session = new TerminalSession(terminalHalf, hostHalf);
+        _sessions[terminalId] = session;
+        session.Start();
+        return session;
+    }
+
+    private async Task ShowCoreAsync(TerminalProxy proxy, Guid terminalId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var method = _serviceType!.GetMethod("ShowAsync", new[] { typeof(Guid), typeof(CancellationToken) });
+            if (method != null)
+            {
+                await InvokeAsync(method, proxy.Service, new object?[] { terminalId, cancellationToken })
+                    .ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Failing to raise the window must not stop the command from being submitted.
+            VsixTelemetry.TrackException(ex);
+        }
+    }
+
+    private async Task CloseCoreAsync(TerminalProxy proxy, Guid terminalId, CancellationToken cancellationToken)
+    {
+        var method = _serviceType!.GetMethod("CloseAsync", new[] { typeof(Guid), typeof(CancellationToken) });
+        if (method != null)
+        {
+            await InvokeAsync(method, proxy.Service, new object?[] { terminalId, cancellationToken })
+                .ConfigureAwait(false);
+        }
+    }
+
+    private static bool IsDeveloperProfile(object? profile)
+    {
+        var arguments = profile?.GetType().GetProperty("Arguments")?.GetValue(profile) as string;
+        return arguments != null
+            && (arguments.IndexOf("Enter-VsDevShell", StringComparison.OrdinalIgnoreCase) >= 0
+                || arguments.IndexOf("VsDevCmd.bat", StringComparison.OrdinalIgnoreCase) >= 0);
+    }
+
+    /// <summary>Queues a directory change that both PowerShell and cmd.exe understand.</summary>
+    private static string ChangeDirectory(string workingDirectory) => $"cd \"{workingDirectory}\"\r";
 
     internal async Task<IReadOnlyList<Guid>?> GetTerminalIdsAsync(CancellationToken cancellationToken)
     {
@@ -146,17 +425,30 @@ internal sealed class TerminalInterop
             var result = await InvokeAsync(method, proxy.Service, new object?[] { cancellationToken })
                 .ConfigureAwait(false);
 
-            return result is IEnumerable ids
-                ? ids.Cast<Guid>().ToList()
-                : null;
+            if (result is not IEnumerable ids)
+            {
+                return null;
+            }
+
+            var terminalIds = ids.Cast<Guid>().ToList();
+            PruneSessions(terminalIds);
+            return terminalIds;
         }
     }
 
     internal Task<bool> ShowTerminalAsync(Guid terminalId, CancellationToken cancellationToken) =>
         InvokeByIdAsync("ShowAsync", terminalId, cancellationToken);
 
-    internal Task<bool> CloseTerminalAsync(Guid terminalId, CancellationToken cancellationToken) =>
-        InvokeByIdAsync("CloseAsync", terminalId, cancellationToken);
+    internal async Task<bool> CloseTerminalAsync(Guid terminalId, CancellationToken cancellationToken)
+    {
+        var closed = await InvokeByIdAsync("CloseAsync", terminalId, cancellationToken).ConfigureAwait(false);
+        if (closed)
+        {
+            RemoveSession(terminalId);
+        }
+
+        return closed;
+    }
 
     internal async Task<bool> CloseAllTerminalsAsync(CancellationToken cancellationToken)
     {
@@ -175,11 +467,20 @@ internal sealed class TerminalInterop
             }
 
             await InvokeAsync(method, proxy.Service, new object?[] { cancellationToken }).ConfigureAwait(false);
+
+            foreach (var terminalId in _sessions.Keys)
+            {
+                RemoveSession(terminalId);
+            }
+
             return true;
         }
     }
 
-    private async Task<bool> InvokeByIdAsync(string methodName, Guid terminalId, CancellationToken cancellationToken)
+    private async Task<bool> InvokeByIdAsync(
+        string methodName,
+        Guid terminalId,
+        CancellationToken cancellationToken)
     {
         var proxy = await AcquireProxyAsync(cancellationToken).ConfigureAwait(false);
         if (proxy == null)
@@ -197,92 +498,35 @@ internal sealed class TerminalInterop
 
             await InvokeAsync(method, proxy.Service, new object?[] { terminalId, cancellationToken })
                 .ConfigureAwait(false);
+
             return true;
         }
     }
 
     /// <summary>
-    /// Builds a ProfileConfig that runs <paramref name="command"/> through cmd.exe. When the
-    /// Visual Studio developer command script can be located it is chained in first, so the
-    /// command sees the same PATH and environment as the Developer Command Prompt - which is
-    /// what tooling like msbuild, vstest.console and dotnet-coverage expects.
+    /// Drops sessions whose terminal was closed outside these tools, so a stale stream is not
+    /// reused for a later command.
     /// </summary>
-    private object? BuildCommandProfile(string command, out bool developerEnvironment)
+    private void PruneSessions(IReadOnlyCollection<Guid> liveTerminalIds)
     {
-        developerEnvironment = false;
-
-        var profile = Activator.CreateInstance(_profileConfigType!);
-        if (profile == null)
+        foreach (var terminalId in _sessions.Keys)
         {
-            return null;
-        }
-
-        var comSpec = Environment.GetEnvironmentVariable("COMSPEC");
-        if (string.IsNullOrWhiteSpace(comSpec))
-        {
-            comSpec = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.System),
-                "cmd.exe");
-        }
-
-        var devCmd = TryFindDeveloperCommandScript();
-        string arguments;
-        if (devCmd != null)
-        {
-            developerEnvironment = true;
-            // The outer pair of quotes is what cmd.exe /k requires when the command line itself
-            // contains quoted paths.
-            arguments = $"/k \"\"{devCmd}\" && {command}\"";
-        }
-        else
-        {
-            arguments = $"/k {command}";
-        }
-
-        SetProperty(profile, "Location", comSpec);
-        SetProperty(profile, "Arguments", arguments);
-        SetProperty(profile, "CreatePTY", true);
-
-        return profile;
-    }
-
-    /// <summary>
-    /// Locates VsDevCmd.bat for the running instance. VSAPPIDDIR points at Common7\IDE inside
-    /// devenv, and the script sits alongside in Common7\Tools.
-    /// </summary>
-    internal static string? TryFindDeveloperCommandScript()
-    {
-        try
-        {
-            var ideDirectory = Environment.GetEnvironmentVariable("VSAPPIDDIR");
-            if (string.IsNullOrWhiteSpace(ideDirectory))
+            if (!liveTerminalIds.Contains(terminalId))
             {
-                return null;
+                RemoveSession(terminalId);
             }
-
-            var script = Path.GetFullPath(
-                Path.Combine(ideDirectory, "..", "Tools", "VsDevCmd.bat"));
-
-            return File.Exists(script) ? script : null;
-        }
-        catch (Exception ex)
-        {
-            VsixTelemetry.TrackException(ex);
-            return null;
         }
     }
 
-    private static bool MatchesCreateSignature(MethodInfo method)
+    private void RemoveSession(Guid terminalId)
     {
-        var parameters = method.GetParameters();
-        return parameters.Length == 4
-            && parameters[0].ParameterType == typeof(CancellationToken)
-            && parameters[1].ParameterType == typeof(string)
-            && parameters[2].ParameterType.FullName == ProfileConfigTypeName
-            && parameters[3].ParameterType == typeof(string);
+        if (_sessions.TryRemove(terminalId, out var session))
+        {
+            session.Dispose();
+        }
     }
 
-    private static void SetProperty(object target, string name, object value) =>
+    private static void SetProperty(object target, string name, object? value) =>
         target.GetType().GetProperty(name)?.SetValue(target, value);
 
     /// <summary>
@@ -310,15 +554,60 @@ internal sealed class TerminalInterop
     }
 
     /// <summary>
-    /// Acquires a brokered-service proxy to the terminal. The proxy is created per operation and
-    /// disposed with it; it is an RPC channel, so disposing it does not affect terminals that
-    /// were opened through it.
+    /// Acquires the terminal service through the VS 2026 service provider when available, or
+    /// through the VS 2022 brokered-service descriptor otherwise. Both paths retain one service
+    /// instance because terminal IDs are stored per instance. Only the brokered proxy is owned
+    /// by this object; directly acquired VS services remain owned by VS.
     /// </summary>
     private async Task<TerminalProxy?> AcquireProxyAsync(CancellationToken cancellationToken)
     {
         try
         {
             if (!TryResolveTypes())
+            {
+                return null;
+            }
+
+            var vsServiceType = _terminalAssembly!.GetType(VsServiceTypeName);
+            var vsServiceInterfaceType = _terminalAssembly.GetType(VsServiceInterfaceTypeName);
+            if (vsServiceType != null && vsServiceInterfaceType != null)
+            {
+                if (_directService == null)
+                {
+                    var vsService = _serviceAccessor?.Invoke(vsServiceType);
+                    if (vsService == null)
+                    {
+                        return null;
+                    }
+
+                    var createService = vsServiceInterfaceType.GetMethod("CreateTerminalService", Type.EmptyTypes);
+                    var directService = createService?.Invoke(vsService, null);
+                    if (directService == null || !_serviceType!.IsInstanceOfType(directService))
+                    {
+                        return null;
+                    }
+
+                    // Each factory call returns a service with an independent terminal list.
+                    // Reuse one instance so create/list/show/close all observe the same terminals.
+                    _directService = directService;
+                }
+
+                return new TerminalProxy(
+                    _directService,
+                    ownsService: false,
+                    useTerminalWindowOptions: true);
+            }
+
+            if (_brokeredService != null)
+            {
+                return new TerminalProxy(_brokeredService, ownsService: false);
+            }
+
+            var descriptors = _terminalAssembly.GetType(DescriptorsTypeName);
+            var descriptor = descriptors
+                ?.GetProperty("TerminalServiceDescriptor", BindingFlags.Public | BindingFlags.Static)
+                ?.GetValue(null) as ServiceRpcDescriptor;
+            if (descriptor == null)
             {
                 return null;
             }
@@ -339,7 +628,7 @@ internal sealed class TerminalInterop
 
             var pending = getProxy.Invoke(
                 broker,
-                new object?[] { _descriptor, default(ServiceActivationOptions), cancellationToken });
+                new object?[] { descriptor, default(ServiceActivationOptions), cancellationToken });
 
             // GetProxyAsync returns ValueTask<T>, which has to be turned into a Task before it
             // can be awaited through reflection.
@@ -352,7 +641,13 @@ internal sealed class TerminalInterop
             await task.ConfigureAwait(false);
 
             var service = task.GetType().GetProperty("Result")?.GetValue(task);
-            return service == null ? null : new TerminalProxy(service);
+            if (service == null)
+            {
+                return null;
+            }
+
+            _brokeredService = service;
+            return new TerminalProxy(service, ownsService: false);
         }
         catch (Exception ex)
         {
@@ -363,12 +658,10 @@ internal sealed class TerminalInterop
 
     private bool TryResolveTypes()
     {
-        if (_typesResolved)
+        if (_terminalAssembly != null && _serviceType != null)
         {
-            return _serviceType != null && _profileConfigType != null && _descriptor != null;
+            return true;
         }
-
-        _typesResolved = true;
 
         var assembly = _assemblyResolver();
         if (assembly == null)
@@ -376,15 +669,15 @@ internal sealed class TerminalInterop
             return false;
         }
 
-        _serviceType = assembly.GetType(ServiceTypeName);
-        _profileConfigType = assembly.GetType(ProfileConfigTypeName);
+        var serviceType = assembly.GetType(ServiceTypeName);
+        if (serviceType == null)
+        {
+            return false;
+        }
 
-        var descriptors = assembly.GetType(DescriptorsTypeName);
-        _descriptor = descriptors
-            ?.GetProperty("TerminalServiceDescriptor", BindingFlags.Public | BindingFlags.Static)
-            ?.GetValue(null) as ServiceRpcDescriptor;
-
-        return _serviceType != null && _profileConfigType != null && _descriptor != null;
+        _terminalAssembly = assembly;
+        _serviceType = serviceType;
+        return true;
     }
 
     private static Assembly? TryLoadTerminalAssembly()
@@ -408,21 +701,149 @@ internal sealed class TerminalInterop
         }
     }
 
-    /// <summary>Owns the lifetime of a brokered-service proxy.</summary>
+    public void Dispose()
+    {
+        foreach (var terminalId in _sessions.Keys)
+        {
+            RemoveSession(terminalId);
+        }
+
+        (_brokeredService as IDisposable)?.Dispose();
+        _brokeredService = null;
+    }
+
+    /// <summary>Outcome of opening a terminal, including the stream used to type into it.</summary>
+    private sealed class OpenedTerminal
+    {
+        internal Guid TerminalId { get; private set; }
+
+        internal TerminalSession? Session { get; private set; }
+
+        internal bool DeveloperEnvironment { get; private set; }
+
+        internal string? Message { get; private set; }
+
+        internal static OpenedTerminal Success(Guid terminalId, TerminalSession session, bool developerEnvironment) =>
+            new()
+            {
+                TerminalId = terminalId,
+                Session = session,
+                DeveloperEnvironment = developerEnvironment
+            };
+
+        internal static OpenedTerminal Failure(string message) => new() { Message = message };
+    }
+
+    /// <summary>
+    /// Duplex stream pair attached to one terminal. The terminal half is given to Visual Studio,
+    /// which reads it as user input and writes PTY output into it. Commands are written to the
+    /// host half, and its output is drained continuously so the terminal never blocks on a full
+    /// pipe when nothing reads the copy of its output.
+    /// </summary>
+    private sealed class TerminalSession : IDisposable
+    {
+        private const int DrainBufferSize = 4096;
+
+        private readonly Stream _terminalHalf;
+        private readonly Stream _hostHalf;
+        private readonly CancellationTokenSource _drainCancellation = new();
+        private readonly SemaphoreSlim _writeGate = new(1, 1);
+
+        internal TerminalSession(Stream terminalHalf, Stream hostHalf)
+        {
+            _terminalHalf = terminalHalf;
+            _hostHalf = hostHalf;
+        }
+
+        internal void Start() => _ = Task.Run(DrainAsync);
+
+        internal async Task SendAsync(string text, CancellationToken cancellationToken)
+        {
+            var bytes = Encoding.UTF8.GetBytes(text);
+
+            await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await _hostHalf.WriteAsync(bytes, 0, bytes.Length, cancellationToken).ConfigureAwait(false);
+                await _hostHalf.FlushAsync(cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                _writeGate.Release();
+            }
+        }
+
+        private async Task DrainAsync()
+        {
+            var buffer = new byte[DrainBufferSize];
+            try
+            {
+                while (!_drainCancellation.IsCancellationRequested)
+                {
+                    var read = await _hostHalf
+                        .ReadAsync(buffer, 0, buffer.Length, _drainCancellation.Token)
+                        .ConfigureAwait(false);
+                    if (read == 0)
+                    {
+                        break;
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception)
+            {
+                // The stream is torn down when the terminal or the extension shuts down.
+            }
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                _drainCancellation.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
+            _drainCancellation.Dispose();
+            _hostHalf.Dispose();
+            _writeGate.Dispose();
+            _terminalHalf.Dispose();
+        }
+    }
+    /// <summary>Scopes the lifetime of an owned brokered proxy or a VS-owned service.</summary>
     private sealed class TerminalProxy : IDisposable
     {
-        internal TerminalProxy(object service)
+        private readonly bool _ownsService;
+
+        internal TerminalProxy(
+            object service,
+            bool ownsService = true,
+            bool useTerminalWindowOptions = false)
         {
             Service = service;
+            _ownsService = ownsService;
+            UseTerminalWindowOptions = useTerminalWindowOptions;
         }
 
         internal object Service { get; }
 
-        public void Dispose() => (Service as IDisposable)?.Dispose();
+        internal bool UseTerminalWindowOptions { get; }
+
+        public void Dispose()
+        {
+            if (_ownsService)
+            {
+                (Service as IDisposable)?.Dispose();
+            }
+        }
     }
 }
 
-/// <summary>Result of a terminal creation attempt, before it is shaped for the wire.</summary>
+/// <summary>Result of a terminal operation, before it is shaped for the wire.</summary>
 internal sealed class TerminalCreateOutcome
 {
     private TerminalCreateOutcome()
@@ -430,6 +851,8 @@ internal sealed class TerminalCreateOutcome
     }
 
     internal bool Created { get; private set; }
+
+    internal bool Reused { get; private set; }
 
     internal Guid TerminalId { get; private set; }
 
@@ -444,5 +867,12 @@ internal sealed class TerminalCreateOutcome
         DeveloperEnvironment = developerEnvironment
     };
 
-    internal static TerminalCreateOutcome Unavailable(string message) => new() { Message = message };
+    internal static TerminalCreateOutcome Submitted(Guid id) => new()
+    {
+        Reused = true,
+        TerminalId = id
+    };
+
+    internal static TerminalCreateOutcome Failure(string message) => new() { Message = message };
 }
+

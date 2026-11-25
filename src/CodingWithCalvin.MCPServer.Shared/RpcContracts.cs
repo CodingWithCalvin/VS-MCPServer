@@ -89,7 +89,8 @@ public interface IVisualStudioRpc
     Task<TestStats> GetTestStatsAsync();
 
     // Terminal tools
-    Task<TerminalResult> CreateTerminalAsync(string? name, string? workingDirectory, string? command);
+    Task<TerminalResult> CreateTerminalAsync(string? name, string? workingDirectory);
+    Task<TerminalResult> RunInTerminalAsync(string? terminalId, string? name, string? workingDirectory, string command);
     Task<TerminalListResult> GetTerminalsAsync();
     Task<bool> ShowTerminalAsync(string terminalId);
     Task<bool> CloseTerminalAsync(string terminalId);
