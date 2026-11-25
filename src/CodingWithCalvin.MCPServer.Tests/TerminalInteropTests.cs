@@ -132,6 +132,52 @@ public class TerminalInteropTests
     }
 
     [Fact]
+    public async Task RunInTerminal_WithoutWait_DoesNotReturnOutput()
+    {
+        var service = new StubTerminalService();
+        var interop = Build(service);
+
+        var outcome = await interop.RunInTerminalAsync(
+            null, "MCP", null, "echo hello", CancellationToken.None);
+
+        Assert.True(outcome.Created);
+        Assert.Null(outcome.Output);
+    }
+
+    [Fact]
+    public async Task RunInTerminal_ReturnsRawOutputCapturedDuringTheWait()
+    {
+        var service = new StubTerminalService();
+        var interop = Build(service);
+
+        var outcome = await interop.RunInTerminalAsync(
+            null, "MCP", null, "echo hello", CancellationToken.None, waitMilliseconds: 500);
+
+        Assert.True(outcome.Created);
+        Assert.NotNull(outcome.Output);
+        Assert.Contains("echo hello", outcome.Output);
+    }
+
+    [Fact]
+    public async Task RunInTerminal_ReuseReturnsOnlyTheNewCommandOutput()
+    {
+        var service = new StubTerminalService();
+        var interop = Build(service);
+
+        var created = await interop.CreateTerminalAsync("MCP", null, CancellationToken.None);
+        var first = await interop.RunInTerminalAsync(
+            created.TerminalId.ToString(), null, null, "first-command", CancellationToken.None, 400);
+        var second = await interop.RunInTerminalAsync(
+            created.TerminalId.ToString(), null, null, "second-command", CancellationToken.None, 400);
+
+        Assert.NotNull(first.Output);
+        Assert.Contains("first-command", first.Output);
+        Assert.NotNull(second.Output);
+        Assert.Contains("second-command", second.Output);
+        Assert.DoesNotContain("first-command", second.Output);
+    }
+
+    [Fact]
     public async Task RunInTerminal_WithExistingTerminal_AttachesWhenStreamIsNotOpen()
     {
         var service = new StubTerminalService();
@@ -511,6 +557,10 @@ public class TerminalInteropTests
                         {
                             _attachedInput.Append(text);
                         }
+
+                        // Act like a PTY that echoes its input so tests can assert captured output.
+                        await stream.WriteAsync(buffer, 0, read).ConfigureAwait(false);
+                        await stream.FlushAsync().ConfigureAwait(false);
                     }
                 }
                 catch (Exception)

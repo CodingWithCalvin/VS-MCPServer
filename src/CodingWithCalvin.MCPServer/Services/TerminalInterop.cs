@@ -148,7 +148,8 @@ internal sealed class TerminalInterop : IDisposable
         string? name,
         string? workingDirectory,
         string command,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int waitMilliseconds = 0)
     {
         if (string.IsNullOrWhiteSpace(command))
         {
@@ -190,8 +191,11 @@ internal sealed class TerminalInterop : IDisposable
                             .ConfigureAwait(false);
                     }
 
+                    var baseline = session.CapturedLength;
                     await session.SendAsync(command + "\r", cancellationToken).ConfigureAwait(false);
-                    return TerminalCreateOutcome.Submitted(existingId);
+                    return TerminalCreateOutcome.Submitted(
+                        existingId,
+                        await ReadOutputAsync(session, baseline, waitMilliseconds).ConfigureAwait(false));
                 }
 
                 var terminal = await OpenTerminalAsync(proxy, name, workingDirectory, cancellationToken)
@@ -201,8 +205,13 @@ internal sealed class TerminalInterop : IDisposable
                     return TerminalCreateOutcome.Failure(terminal.Message ?? UnavailableMessage);
                 }
 
+                var createdBaseline = terminal.Session.CapturedLength;
                 await terminal.Session.SendAsync(command + "\r", cancellationToken).ConfigureAwait(false);
-                return TerminalCreateOutcome.Success(terminal.TerminalId, terminal.DeveloperEnvironment);
+                return TerminalCreateOutcome.Success(
+                    terminal.TerminalId,
+                    terminal.DeveloperEnvironment,
+                    await ReadOutputAsync(terminal.Session, createdBaseline, waitMilliseconds)
+                        .ConfigureAwait(false));
             }
             catch (Exception ex)
             {
@@ -210,6 +219,26 @@ internal sealed class TerminalInterop : IDisposable
                 return TerminalCreateOutcome.Failure(ex.Message);
             }
         }
+    }
+
+    /// <summary>
+    /// Waits for the terminal to print and returns whatever it captured after
+    /// <paramref name="baseline"/>. A PTY has no completion signal, so the wait window is the
+    /// only bound on what comes back.
+    /// </summary>
+    private static async Task<string?> ReadOutputAsync(
+        TerminalSession session,
+        long baseline,
+        int waitMilliseconds)
+    {
+        if (waitMilliseconds <= 0)
+        {
+            return null;
+        }
+
+        await Task.Delay(waitMilliseconds).ConfigureAwait(false);
+        var output = session.ReadCapturedSince(baseline);
+        return output.Length == 0 ? null : output;
     }
 
     /// <summary>
@@ -737,17 +766,25 @@ internal sealed class TerminalInterop : IDisposable
     /// <summary>
     /// Duplex stream pair attached to one terminal. The terminal half is given to Visual Studio,
     /// which reads it as user input and writes PTY output into it. Commands are written to the
-    /// host half, and its output is drained continuously so the terminal never blocks on a full
-    /// pipe when nothing reads the copy of its output.
+    /// host half, and the PTY output read from it is kept in a bounded buffer so callers can read
+    /// back what the terminal printed; draining it also stops the terminal blocking on a full
+    /// pipe when nothing else reads its output.
     /// </summary>
     private sealed class TerminalSession : IDisposable
     {
         private const int DrainBufferSize = 4096;
 
+        /// <summary>Cap on retained output, keeping the most recent text.</summary>
+        private const int MaxCapturedCharacters = 256 * 1024;
+
         private readonly Stream _terminalHalf;
         private readonly Stream _hostHalf;
         private readonly CancellationTokenSource _drainCancellation = new();
         private readonly SemaphoreSlim _writeGate = new(1, 1);
+        private readonly Decoder _decoder = Encoding.UTF8.GetDecoder();
+        private readonly object _outputGate = new();
+        private readonly StringBuilder _captured = new();
+        private long _capturedTotal;
 
         internal TerminalSession(Stream terminalHalf, Stream hostHalf)
         {
@@ -756,6 +793,59 @@ internal sealed class TerminalInterop : IDisposable
         }
 
         internal void Start() => _ = Task.Run(DrainAsync);
+
+        /// <summary>
+        /// Number of characters captured so far, used as the start marker for a command so that
+        /// output from earlier commands is not returned again.
+        /// </summary>
+        internal long CapturedLength
+        {
+            get
+            {
+                lock (_outputGate)
+                {
+                    return _capturedTotal;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Raw text captured since <paramref name="offset"/>, clipped to what is still retained.
+        /// </summary>
+        internal string ReadCapturedSince(long offset)
+        {
+            lock (_outputGate)
+            {
+                var firstRetained = _capturedTotal - _captured.Length;
+                if (offset < firstRetained)
+                {
+                    offset = firstRetained;
+                }
+
+                if (offset >= _capturedTotal)
+                {
+                    return string.Empty;
+                }
+
+                var start = (int)(offset - firstRetained);
+                return _captured.ToString(start, _captured.Length - start);
+            }
+        }
+
+        private void AppendCaptured(char[] characters, int count)
+        {
+            lock (_outputGate)
+            {
+                _captured.Append(characters, 0, count);
+                _capturedTotal += count;
+
+                var overflow = _captured.Length - MaxCapturedCharacters;
+                if (overflow > 0)
+                {
+                    _captured.Remove(0, overflow);
+                }
+            }
+        }
 
         internal async Task SendAsync(string text, CancellationToken cancellationToken)
         {
@@ -776,6 +866,7 @@ internal sealed class TerminalInterop : IDisposable
         private async Task DrainAsync()
         {
             var buffer = new byte[DrainBufferSize];
+            var characters = new char[DrainBufferSize + 1];
             try
             {
                 while (!_drainCancellation.IsCancellationRequested)
@@ -786,6 +877,12 @@ internal sealed class TerminalInterop : IDisposable
                     if (read == 0)
                     {
                         break;
+                    }
+
+                    var count = _decoder.GetChars(buffer, 0, read, characters, 0);
+                    if (count > 0)
+                    {
+                        AppendCaptured(characters, count);
                     }
                 }
             }
@@ -858,19 +955,23 @@ internal sealed class TerminalCreateOutcome
 
     internal bool DeveloperEnvironment { get; private set; }
 
+    internal string? Output { get; private set; }
+
     internal string? Message { get; private set; }
 
-    internal static TerminalCreateOutcome Success(Guid id, bool developerEnvironment) => new()
+    internal static TerminalCreateOutcome Success(Guid id, bool developerEnvironment, string? output = null) => new()
     {
         Created = true,
         TerminalId = id,
-        DeveloperEnvironment = developerEnvironment
+        DeveloperEnvironment = developerEnvironment,
+        Output = output
     };
 
-    internal static TerminalCreateOutcome Submitted(Guid id) => new()
+    internal static TerminalCreateOutcome Submitted(Guid id, string? output = null) => new()
     {
         Reused = true,
-        TerminalId = id
+        TerminalId = id,
+        Output = output
     };
 
     internal static TerminalCreateOutcome Failure(string message) => new() { Message = message };

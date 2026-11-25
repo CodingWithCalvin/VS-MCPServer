@@ -28,6 +28,14 @@ public class TerminalResult
     public string? WorkingDirectory { get; set; }
 
     /// <summary>
+    /// Raw text the terminal printed while the command was being submitted, captured for the
+    /// requested wait window. It is unprocessed PTY output: it still contains ANSI escape
+    /// sequences, the echoed command and the shell prompt, and there is no exit code or
+    /// indication that the command finished.
+    /// </summary>
+    public string? Output { get; set; }
+
+    /// <summary>
     /// True when the terminal's default profile loads the Visual Studio developer environment,
     /// so that tooling such as msbuild and dotnet-coverage is on PATH. Unknown (false) when a
     /// command is submitted to a terminal that was opened by someone else.

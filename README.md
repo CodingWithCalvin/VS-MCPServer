@@ -155,9 +155,11 @@ so the developer environment is already available. Passing a `terminalId` submit
 command to that terminal's existing shell, keeping its state and current directory; omit it
 to open a new terminal.
 
-> ⚠️ **Terminal output is not captured.** The Visual Studio terminal is a raw PTY with no
-> exit code or command boundaries, so `terminal_run` reports only whether the command was
-> submitted. To read results, redirect output to a file and read it back with `document_read`.
+> ⚠️ **Terminal output is returned raw.** `terminal_run` returns whatever the terminal printed
+> during `waitMilliseconds` (default `500`) in `Output`. The Visual Studio terminal is a raw PTY,
+> so that text still contains ANSI escape sequences, the echoed command and the shell prompt, and
+> there is no exit code or completion signal. For clean, complete results, redirect output to a
+> file and read it back with `document_read`.
 
 ### 🪟 Window Tools
 

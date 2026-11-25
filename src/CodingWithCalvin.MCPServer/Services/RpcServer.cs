@@ -302,8 +302,8 @@ public class RpcServer : IRpcServer, IVisualStudioRpc
 
     public Task<TerminalResult> CreateTerminalAsync(string? name, string? workingDirectory)
         => _vsService.CreateTerminalAsync(name, workingDirectory);
-    public Task<TerminalResult> RunInTerminalAsync(string? terminalId, string? name, string? workingDirectory, string command)
-        => _vsService.RunInTerminalAsync(terminalId, name, workingDirectory, command);
+    public Task<TerminalResult> RunInTerminalAsync(string? terminalId, string? name, string? workingDirectory, string command, int waitMilliseconds)
+        => _vsService.RunInTerminalAsync(terminalId, name, workingDirectory, command, waitMilliseconds);
     public Task<TerminalListResult> GetTerminalsAsync() => _vsService.GetTerminalsAsync();
     public Task<bool> ShowTerminalAsync(string terminalId) => _vsService.ShowTerminalAsync(terminalId);
     public Task<bool> CloseTerminalAsync(string terminalId) => _vsService.CloseTerminalAsync(terminalId);

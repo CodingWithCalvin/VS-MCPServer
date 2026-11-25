@@ -3328,7 +3328,8 @@ public class VisualStudioService : IVisualStudioService, IDisposable
         string? terminalId,
         string? name,
         string? workingDirectory,
-        string command)
+        string command,
+        int waitMilliseconds)
     {
         using var activity = VsixTelemetry.Tracer.StartActivity("RunInTerminal");
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
@@ -3346,7 +3347,8 @@ public class VisualStudioService : IVisualStudioService, IDisposable
                 name,
                 directory,
                 command,
-                CancellationToken.None);
+                CancellationToken.None,
+                waitMilliseconds);
 
             return ToTerminalResult(outcome, command, directory);
         }
@@ -3370,6 +3372,7 @@ public class VisualStudioService : IVisualStudioService, IDisposable
             Command = command,
             WorkingDirectory = workingDirectory,
             DeveloperEnvironment = outcome.DeveloperEnvironment,
+            Output = outcome.Output,
             Message = outcome.Message
         };
 
