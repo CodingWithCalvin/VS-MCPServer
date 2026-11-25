@@ -147,12 +147,17 @@
 | `terminal_close_all` | Close every integrated terminal |
 | `terminal_create` | Open an empty terminal using the default profile |
 | `terminal_list` | List the open terminal identifiers |
-| `terminal_run` | Run a command in a new terminal, inside the VS developer environment |
+| `terminal_run` | Run a command in a new terminal, or in an existing one via `terminalId` |
 | `terminal_show` | Bring a terminal into view |
 
+Terminals open with Visual Studio's default profile (PowerShell 7 with `Enter-VsDevShell`),
+so the developer environment is already available. Passing a `terminalId` submits the
+command to that terminal's existing shell, keeping its state and current directory; omit it
+to open a new terminal.
+
 > ⚠️ **Terminal output is not captured.** The Visual Studio terminal is a raw PTY with no
-> exit code or command boundaries, so `terminal_run` reports only whether the terminal opened.
-> To read results, redirect output to a file and read it back with `document_read`.
+> exit code or command boundaries, so `terminal_run` reports only whether the command was
+> submitted. To read results, redirect output to a file and read it back with `document_read`.
 
 ### 🪟 Window Tools
 
